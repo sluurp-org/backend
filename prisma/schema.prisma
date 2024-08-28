@@ -1,0 +1,453 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id       Int     @id @default(autoincrement())
+  name     String?
+  email    String  @unique
+  password String
+  salt     String
+
+  refreshToken String?
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  deletedAt     DateTime?
+  workspaceUser WorkspaceUser[]
+}
+
+model WorkspaceUser {
+  id          Int           @id @default(autoincrement())
+  userId      Int
+  workspaceId Int
+  role        WorkspaceRole @default(MEMBER)
+
+  user      User      @relation(fields: [userId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userId, workspaceId])
+}
+
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
+model Workspace {
+  id   Int    @id @default(autoincrement())
+  name String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  workspaceUser   WorkspaceUser[]
+  store           Store[]
+  product         Product[]
+  order           Order[]
+  content         Content[]
+  event           Event[]
+  kakaoCredential KakaoCredential?
+  emailCredential EmailCredential?
+  messageTemplate MessageTemplate[]
+  orderHistory    OrderHistory[]
+  ContentGroup    ContentGroup[]
+}
+
+model Store {
+  id          Int       @id @default(autoincrement())
+  name        String
+  type        StoreType
+  enabled     Boolean   @default(true)
+  workspaceId Int
+
+  lastProductSyncAt DateTime?
+  lastOrderSyncAt   DateTime?
+
+  smartStoreCredentials SmartStoreCredentials?
+  workspace             Workspace              @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  product      Product[]
+  order        Order[]
+  orderHistory OrderHistory[]
+}
+
+enum StoreType {
+  SMARTSTORE
+}
+
+model SmartStoreCredentials {
+  id        Int    @id @default(autoincrement())
+  name      String
+  storeId   Int    @unique
+  channelId Int    @unique
+
+  applicationId     String
+  applicationSecret String
+  emailParseable    Boolean @default(false)
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  store Store @relation(fields: [storeId], references: [id])
+}
+
+model SmartStoreToken {
+  applicationId     String
+  applicationSecret String
+
+  accessToken String?
+  expiresAt   DateTime?
+
+  @@unique([applicationId, applicationSecret])
+}
+
+model Product {
+  id           Int     @id @default(autoincrement())
+  name         String
+  productImage String?
+
+  productId   String
+  storeId     Int
+  workspaceId Int
+
+  store     Store     @relation(fields: [storeId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt      DateTime         @default(now())
+  updatedAt      DateTime         @default(now()) @updatedAt
+  deletedAt      DateTime?
+  productVariant ProductVariant[]
+  order          Order[]
+  event          Event[]
+
+  @@unique([productId, storeId])
+}
+
+model ProductVariant {
+  id        Int    @id @default(autoincrement())
+  productId Int
+  variantId String
+
+  name String
+
+  product Product @relation(fields: [productId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+  order     Order[]
+  event     Event[]
+
+  @@unique([variantId, productId])
+}
+
+model Order {
+  id Int @id @default(autoincrement())
+
+  productOrderId String
+  orderId        String
+  status         OrderStatus @default(PAY_WAITING)
+
+  storeId          Int
+  productId        Int
+  productVariantId Int?
+  workspaceId      Int
+
+  ordererName  String
+  ordererEmail String?
+  ordererPhone String?
+
+  receiverName  String?
+  receiverEmail String?
+  receiverPhone String?
+
+  price    Int
+  quantity Int
+  orderAt  DateTime
+
+  deliveryAddress        String?
+  deliveryMessage        String?
+  deliveryCompany        String?
+  deliveryTrackingNumber String?
+
+  product   Product         @relation(fields: [productId], references: [id])
+  variant   ProductVariant? @relation(fields: [productVariantId], references: [id])
+  store     Store           @relation(fields: [storeId], references: [id])
+  workspace Workspace       @relation(fields: [workspaceId], references: [id])
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  deletedAt    DateTime?
+  eventHistory EventHistory[]
+  OrderHistory OrderHistory[]
+
+  @@unique([orderId, productId, productOrderId, storeId])
+  @@unique([orderId, productOrderId, storeId])
+  @@index([productOrderId])
+}
+
+enum OrderStatus {
+  PAY_WAITING
+  PAYED
+  PRODUCT_PREPARE
+  DELIVERING
+  DELIVERED
+  PURCHASE_CONFIRM
+  EXCHANGE
+  CANCEL
+  REFUND
+  CANCEL_NOPAY
+}
+
+model OrderHistory {
+  id Int @id @default(autoincrement())
+
+  changedStatus OrderStatus
+  message       String?
+
+  eventId     Int?
+  orderId     Int
+  storeId     Int
+  workspaceId Int
+
+  event     Event?    @relation(fields: [eventId], references: [id])
+  order     Order     @relation(fields: [orderId], references: [id])
+  store     Store     @relation(fields: [storeId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  @@index([orderId, workspaceId])
+}
+
+model ContentGroup {
+  id          Int             @id @default(autoincrement())
+  name        String
+  workspaceId Int
+  type        ContentType
+  provider    ContentProvider
+
+  oneTime       Boolean @default(false)
+  expireMinute  Int?
+  downloadLimit Int?
+
+  workspace       Workspace         @relation(fields: [workspaceId], references: [id])
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  deletedAt       DateTime?
+  contentExternal ContentExternal?
+  content         Content[]
+  messageTemplate MessageTemplate[]
+}
+
+model ContentExternal {
+  id        Int @id @default(autoincrement())
+  contentId Int @unique
+
+  url     String
+  headers Json?
+  type    ContentExternalType
+
+  contentGroup ContentGroup @relation(fields: [contentId], references: [id])
+}
+
+enum ContentExternalType {
+  TEXT
+  FILE
+}
+
+enum ContentProvider {
+  LOCAL
+  EXTERNAL
+}
+
+enum ContentType {
+  LINK
+  CODE
+  FILE
+  TEXT
+}
+
+model Content {
+  id        Int     @id @default(autoincrement())
+  contentId Int
+  data      String?
+  file      String?
+
+  contentGroup ContentGroup @relation(fields: [contentId], references: [id])
+
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @default(now()) @updatedAt
+  deletedAt   DateTime?
+  Workspace   Workspace? @relation(fields: [workspaceId], references: [id])
+  workspaceId Int?
+}
+
+model KakaoCredential {
+  id          Int    @id @default(autoincrement())
+  workspaceId Int    @unique
+  channelId   String @unique
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  kakaoTemplate KakaoTemplate[]
+}
+
+model EmailCredential {
+  id          Int @id @default(autoincrement())
+  workspaceId Int @unique
+
+  provider EmailProvider
+  userId   String
+  password String
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @default(now()) @updatedAt
+  deletedAt     DateTime?
+  emailTemplate EmailTemplate[]
+}
+
+enum EmailProvider {
+  GMAIL
+  NAVER
+}
+
+model Event {
+  id               Int    @id @default(autoincrement())
+  name             String
+  workspaceId      Int
+  productId        Int
+  productVariantId Int?
+  messageId        Int
+
+  type OrderStatus
+
+  product        Product         @relation(fields: [productId], references: [id])
+  productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
+  workspace      Workspace       @relation(fields: [workspaceId], references: [id])
+  message        MessageTemplate @relation(fields: [messageId], references: [id])
+
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  deletedAt    DateTime?
+  eventHistory EventHistory[]
+  OrderHistory OrderHistory[]
+}
+
+model EventHistory {
+  id      Int @id @default(autoincrement())
+  eventId Int
+  orderId Int
+
+  status  EventStatus
+  message String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  event Event @relation(fields: [eventId], references: [id])
+  order Order @relation(fields: [orderId], references: [id])
+}
+
+enum EventStatus {
+  PROCESSING
+  SUCCESS
+  FAIL
+}
+
+model MessageTemplate {
+  id        Int                 @id @default(autoincrement())
+  name      String
+  type      MessageTemplateType
+  variables Json?
+
+  workspaceId       Int
+  contentId         Int?
+  emailTemplateId   Int? @unique
+  webhookTemplateId Int? @unique
+  kakaoTemplateId   Int? @unique
+
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  contentGroup    ContentGroup?    @relation(fields: [contentId], references: [id])
+  emailTemplate   EmailTemplate?   @relation(fields: [emailTemplateId], references: [id])
+  webhookTemplate WebhookTemplate? @relation(fields: [webhookTemplateId], references: [id])
+  kakaoTemplate   KakaoTemplate?   @relation(fields: [kakaoTemplateId], references: [id])
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+  Event     Event[]
+}
+
+enum MessageTemplateType {
+  EMAIL
+  KAKAO
+  WEBHOOK
+}
+
+model EmailTemplate {
+  id Int @id @default(autoincrement())
+
+  credentialId Int
+  title        String
+  body         String
+  variables    Json?
+
+  credential EmailCredential @relation(fields: [credentialId], references: [id])
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  deletedAt       DateTime?
+  messageTemplate MessageTemplate?
+}
+
+model WebhookTemplate {
+  id Int @id @default(autoincrement())
+
+  name      String
+  url       String
+  headers   Json?
+  body      Json?
+  variables Json?
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  deletedAt       DateTime?
+  messageTemplate MessageTemplate?
+}
+
+model KakaoTemplate {
+  id Int @id @default(autoincrement())
+
+  credentialId Int?
+  templateId   String
+  variables    Json?
+
+  credential KakaoCredential? @relation(fields: [credentialId], references: [id])
+
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @default(now()) @updatedAt
+  deletedAt       DateTime?
+  messageTemplate MessageTemplate?
+}

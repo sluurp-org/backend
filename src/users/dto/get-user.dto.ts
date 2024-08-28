@@ -1,0 +1,43 @@
+import { ApiProperty } from '@nestjs/swagger';
+import { Exclude, Expose } from 'class-transformer';
+
+export class GetUserDto {
+  @ApiProperty({
+    description: '사용자 아이디',
+    example: '1',
+  })
+  @Expose()
+  id: number;
+
+  @ApiProperty({
+    description: '사용자 이름',
+    example: '홍길동',
+  })
+  @Expose()
+  name: string;
+
+  @ApiProperty({
+    description: '이메일',
+    example: 'example@example.com',
+  })
+  @Expose()
+  email: string;
+
+  @Exclude()
+  password: string;
+
+  @Exclude()
+  salt: string;
+
+  @Exclude()
+  refreshToken: string;
+
+  @Exclude()
+  createdAt: Date;
+
+  @Exclude()
+  updatedAt: Date;
+
+  @Exclude()
+  deletedAt: Date;
+}

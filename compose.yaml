@@ -1,0 +1,28 @@
+version: '3.8'
+name: sendstore
+
+services:
+  mysql:
+    image: mysql:latest
+    container_name: mysql
+    restart: always
+    environment:
+      MYSQL_ROOT_PASSWORD: sendstore
+      MYSQL_DATABASE: sendstore
+      MYSQL_USER: sendstore
+      MYSQL_PASSWORD: sendstore
+    ports:
+      - '3306:3306'
+  redis:
+    image: redis:latest
+    container_name: redis
+    restart: always
+    ports:
+      - '6379:6379'
+  rabbitmq:
+    image: rabbitmq:latest
+    container_name: rabbitmq
+    restart: always
+    ports:
+      - '5672:5672'
+      - '15672:15672'

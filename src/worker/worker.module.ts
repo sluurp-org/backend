@@ -2,11 +2,22 @@ import { Module } from '@nestjs/common';
 import { WorkerController } from './worker.controller';
 import { WorkerService } from './worker.service';
 import { OrderModule } from 'src/order/order.module';
-import { NcommerceModule } from 'src/ncommerce/ncommerce.module';
+import { SmartstoreModule } from 'src/smartstore/smartstore.module';
 import { StoreModule } from 'src/store/store.module';
+import { PrismaModule } from 'src/prisma/prisma.module';
+import { CreditModule } from 'src/credit/credit.module';
+import { PurchaseModule } from 'src/purchase/purchase.module';
 
 @Module({
-  imports: [OrderModule, NcommerceModule, OrderModule, StoreModule],
+  imports: [
+    OrderModule,
+    SmartstoreModule,
+    OrderModule,
+    StoreModule,
+    PrismaModule,
+    CreditModule,
+    PurchaseModule,
+  ],
   controllers: [WorkerController],
   providers: [WorkerService],
 })

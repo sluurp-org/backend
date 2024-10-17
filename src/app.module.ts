@@ -4,10 +4,9 @@ import {
   NestModule,
   RequestMethod,
 } from '@nestjs/common';
-import { ConfigModule } from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 
 import { WorkspaceMiddleware } from './workspace/middleware/workspace.middleware';
-import { NcommerceModule } from './ncommerce/ncommerce.module';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ProductModule } from './product/product.module';
 import { ContentModule } from './content/content.module';
@@ -23,6 +22,18 @@ import { OrderModule } from './order/order.module';
 import { MessageModule } from './message/message.module';
 import { WorkerModule } from './worker/worker.module';
 import { CommandModule } from 'nestjs-command';
+import { IsBcryptHashConstraint } from './common/validator/hash.validator';
+import { NaverModule } from './naver/naver.module';
+import { CreditModule } from './credit/credit.module';
+import { FileModule } from './file/file.module';
+import { IsVariableConstraint } from './common/validator/variable.validator';
+import { EventModule } from './event/event.module';
+import { SqsModule } from '@ssut/nestjs-sqs';
+import { PurchaseModule } from './purchase/purchase.module';
+import { AwsModule } from './aws/aws.module';
+import { PortoneModule } from './portone/portone.module';
+import { MailModule } from './mail/mail.module';
+import { EventHistoryModule } from './event-history/event-history.module';
 
 @Module({
   imports: [
@@ -31,21 +42,47 @@ import { CommandModule } from 'nestjs-command';
       isGlobal: true,
       validationSchema,
     }),
+    SqsModule.registerAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        producers: [
+          {
+            name: 'commerce',
+            region: configService.get('AWS_REGION'),
+            queueUrl: configService.get('COMMERCE_SQS_QUEUE_URL'),
+          },
+          {
+            name: 'event',
+            region: configService.get('AWS_REGION'),
+            queueUrl: configService.get('EVENT_SQS_QUEUE_URL'),
+          },
+        ],
+      }),
+    }),
     KakaoModule,
     WorkspaceModule,
     UsersModule,
     AuthModule,
     StoreModule,
-    NcommerceModule,
     ProductModule,
     OrderModule,
     ContentModule,
     MessageModule,
     WorkerModule,
     CommandModule,
+    NaverModule,
+    CreditModule,
+    FileModule,
+    EventModule,
+    PurchaseModule,
+    AwsModule,
+    PortoneModule,
+    MailModule,
+    EventHistoryModule,
   ],
   controllers: [AppController],
-  providers: [AppService],
+  providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],
 })
 export class AppModule implements NestModule {
   configure(consumer: MiddlewareConsumer) {

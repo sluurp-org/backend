@@ -36,19 +36,13 @@ export class StoreCommand {
           emailParseable: store.smartStoreCredentials.emailParseable,
         },
         lastSyncedAt: store.lastOrderSyncAt,
-        provider: 'NCOMMERCE',
+        provider: 'SMARTSTORE',
         storeId: store.id,
       }),
     }));
 
     console.log(`Sending ${sqsPayload.length} messages to SQS`);
-
-    await Promise.all(
-      sqsPayload.map(async (payload) => {
-        await this.sqsService.send('commerce', payload);
-      }),
-    );
-
+    await this.sqsService.send('commerce', sqsPayload);
     console.log('Messages sent to SQS');
   }
 }

@@ -10,7 +10,7 @@ export class PaginationQueryDto {
   })
   @IsOptional()
   @IsNumber()
-  @Min(10)
+  @Min(5)
   @Max(100)
   @Type(() => Number)
   size: number;
@@ -27,7 +27,7 @@ export class PaginationQueryDto {
   page: number;
 
   get take(): number {
-    return this.size || 10;
+    return this.size || 1000;
   }
 
   get skip(): number {

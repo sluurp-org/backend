@@ -1,0 +1,15 @@
+export enum WebhookTypeEnum {
+  TransactionReady = 'Transaction.Ready',
+  TransactionPaid = 'Transaction.Paid',
+  TransactionVirtualAccountIssued = 'Transaction.VirtualAccountIssued',
+  TransactionPartialCancelled = 'Transaction.PartialCancelled',
+  TransactionCancelled = 'Transaction.Cancelled',
+  TransactionFailed = 'Transaction.Failed',
+  TransactionPayPending = 'Transaction.PayPending',
+  TransactionCancelPending = 'Transaction.CancelPending',
+  BillingKeyReady = 'BillingKey.Ready',
+  BillingKeyIssued = 'BillingKey.Issued',
+  BillingKeyFailed = 'BillingKey.Failed',
+  BillingKeyDeleted = 'BillingKey.Deleted',
+  BillingKeyUpdated = 'BillingKey.Updated',
+}

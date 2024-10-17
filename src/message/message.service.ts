@@ -1,93 +1,361 @@
 import {
   Injectable,
-  InternalServerErrorException,
   Logger,
   NotAcceptableException,
+  NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { KakaoService } from 'src/kakao/kakao.service';
-import { CreateMessageDto } from './dto/create-message.dto';
-import { MessageTemplateType, Prisma } from '@prisma/client';
+import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
+import { KakaoTemplateStatus, Prisma, Variables } from '@prisma/client';
+import {
+  CreateKakaoTemplateBodyDto,
+  KakaoTemplateButton,
+  KakaoTemplateButtonType,
+} from './dto/req/subtemplate/create-kakao-template-body.dto';
+import { KakaoButton, KakaoDefaultButton, KakaoWebButton } from 'solapi';
+import { CreateMessageBodyDto } from './dto/req/create-message-body.dto';
+import {
+  UpdateKakaoTemplateBodyDto,
+  UpdateMessageBodyDto,
+} from './dto/req/update-message-body.dto';
+import { randomUUID } from 'crypto';
 
 @Injectable()
 export class MessageService {
-  private readonly logger: Logger = new Logger(MessageService.name);
+  private readonly logger = new Logger(MessageService.name);
   constructor(
     private readonly kakaoService: KakaoService,
     private readonly prismaService: PrismaService,
   ) {}
 
-  public async createMessage(
-    workspaceId: number,
-    createMessageDto: CreateMessageDto,
-  ) {
-    const { name, type, kakaoTemplate, ...rest } = createMessageDto;
+  public findAllVariables() {
+    return this.prismaService.variables.findMany();
+  }
 
-    const createMessage: Prisma.MessageTemplateCreateInput = {
-      workspace: { connect: { id: workspaceId } },
-      ...rest,
-      name,
-      type,
-    };
+  public countVariables() {
+    return this.prismaService.variables.count();
+  }
 
-    if (type === MessageTemplateType.KAKAO) {
-      const kakaoCredential =
-        await this.prismaService.kakaoCredential.findUnique({
-          where: { workspaceId },
-        });
-      if (!kakaoCredential)
-        throw new NotAcceptableException('카카오 인증 정보를 등록해주세요.');
+  public async findAll(id: number, dto: FindMessageQueryDto) {
+    const { name, take, skip } = dto;
+    return this.prismaService.messageTemplate.findMany({
+      where: { workspaceId: id, name: { contains: name } },
+      orderBy: { id: 'desc' },
+      take,
+      skip,
+    });
+  }
 
-      // const test = await this.kakaoService.createKakaoTemplate({
-      //   name,
-      //   ...kakaoTemplate,
-      // buttons: kakaoTemplate.buttons.map((button) => {
-      //   const { name, type, url } = button;
-      //   if (type === KakaoButtonType.PR)
-      //     return {
-      //       buttonName: name,
-      //       buttonType: 'WL',
-      //       linkMo: url,
-      //       linkPc: url,
-      //     };
+  public async count(id: number, dto: FindMessageQueryDto) {
+    const { name } = dto;
+    return this.prismaService.messageTemplate.count({
+      where: { workspaceId: id, name: { contains: name } },
+    });
+  }
 
-      //   return {
-      //     buttonName: button.name,
-      //     buttonType: 'WL',
-      //     linkMo: button.url,
-      //     linkPc: button.url,
-      //   };
-      // }),
-      // quickReplies: kakaoTemplate.quickReplies.map((quickReply) => ({
-      //   name: quickReply.name,
-      //   linkType: quickReply.type,
-      //   linkMo: quickReply.url,
-      //   linkPc: quickReply.url,
-      // })
-      // });
+  public async findOne(id: number, messageId: number) {
+    const message = await this.prismaService.messageTemplate.findUnique({
+      where: { id: messageId, workspaceId: id },
+      include: {
+        kakaoTemplate: true,
+        contentGroup: true,
+      },
+    });
+    const comments = [];
+    if (message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED) {
+      const kakaoTemplate = await this.kakaoService.getKakaoTemplate(
+        message.kakaoTemplate.templateId,
+      );
 
-      // const template = await this.kakaoService.getKakaoTemplate(
-      // kakaoTemplate.templateId,
-      // );
-      // if (!template) throw new NotFoundException('템플릿을 찾을 수 없습니다.');
-
-      // createMessage.kakaoTemplate = {
-      //   create: {
-      //     ...kakaoTemplate,
-      //     credential: { connect: { id: kakaoCredential.id } },
-      //   },
-      // };
+      comments.push(
+        ...kakaoTemplate.comments
+          .filter((c) => c.isAdmin)
+          .map((c) => c.content),
+      );
     }
 
+    if (!message) {
+      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+    }
+
+    return {
+      ...message,
+      kakaoTemplate: {
+        ...message.kakaoTemplate,
+        comments,
+      },
+    };
+  }
+
+  public async createMessage(workspaceId: number, dto: CreateMessageBodyDto) {
+    const { name, kakaoTemplate, ...rest } = dto;
+    return this.prismaService.$transaction(async (tx) => {
+      const message = await tx.messageTemplate.create({
+        data: { name, workspaceId, ...rest },
+      });
+
+      await this.handleKakaoTemplateCreation(
+        tx,
+        message.id,
+        workspaceId,
+        kakaoTemplate,
+      );
+      return message;
+    });
+  }
+
+  private async handleKakaoTemplateCreation(
+    tx: Prisma.TransactionClient,
+    messageId: number,
+    workspaceId: number,
+    kakaoTemplate: CreateKakaoTemplateBodyDto,
+  ) {
+    const kakaoCredential =
+      await this.kakaoService.findWorkspaceKakao(workspaceId);
+
+    const { content, buttons, categoryCode, extra, imageId, imageUrl } =
+      kakaoTemplate;
+    const createdKakaoTemplate = await tx.kakaoTemplate.create({
+      data: {
+        content,
+        buttons,
+        templateId: messageId + randomUUID(),
+        kakaoCredential: {
+          connect: kakaoCredential,
+        },
+        status: KakaoTemplateStatus.UPLOADED,
+        categoryCode,
+        extra,
+        imageId,
+        imageUrl,
+      },
+    });
+
+    const kakaoTemplateName = `kakao-template-${createdKakaoTemplate.id}`;
+    const kakaoTemplateButtons = buttons?.map((button) =>
+      this.mapKakaoButton(button),
+    );
+
+    const { templateId } = await this.kakaoService.createKakaoTemplate({
+      name: kakaoTemplateName,
+      channelId: kakaoCredential.channelId,
+      buttons: kakaoTemplateButtons,
+      content,
+      categoryCode,
+      extra,
+      imageId,
+    });
+
+    if (!templateId)
+      throw new NotFoundException('카카오 템플릿을 생성할 수 없습니다.');
+
     try {
-      return await this.prismaService.messageTemplate.create({
-        data: createMessage,
+      await tx.kakaoTemplate.update({
+        where: { id: createdKakaoTemplate.id },
+        data: { templateId },
+      });
+      await tx.messageTemplate.update({
+        where: { id: messageId },
+        data: {
+          kakaoTemplate: {
+            connect: { id: createdKakaoTemplate.id },
+          },
+        },
       });
     } catch (error) {
       this.logger.error(error);
-      throw new InternalServerErrorException(
-        '메시지 템플릿을 생성할 수 없습니다.',
+      await this.kakaoService.deleteKakaoTemplate(templateId);
+      throw error;
+    }
+  }
+
+  public async requestMessageInspection(
+    workspaceId: number,
+    messageId: number,
+  ) {
+    const message = await this.prismaService.messageTemplate.findUnique({
+      where: { id: messageId, workspaceId },
+      include: { kakaoTemplate: true },
+    });
+    if (!message) {
+      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+    }
+
+    const { kakaoTemplate } = message;
+    return this.prismaService.$transaction(async (tx) => {
+      await this.kakaoService.requestKakaoTemplateInspection(
+        kakaoTemplate.templateId,
+      );
+
+      return tx.kakaoTemplate.update({
+        where: { id: kakaoTemplate.id },
+        data: { status: KakaoTemplateStatus.PENDING },
+      });
+    });
+  }
+
+  public async cancelMessageInspection(workspaceId: number, messageId: number) {
+    const message = await this.prismaService.messageTemplate.findUnique({
+      where: { id: messageId, workspaceId },
+      include: { kakaoTemplate: true },
+    });
+    if (!message) {
+      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+    }
+
+    if (message.kakaoTemplate.status !== KakaoTemplateStatus.PENDING) {
+      throw new NotAcceptableException('검수중인 템플릿이 아닙니다.');
+    }
+
+    const { kakaoTemplate } = message;
+    return this.prismaService.$transaction(async (tx) => {
+      await this.kakaoService.cancelKakaoTemplateInspection(
+        kakaoTemplate.templateId,
+      );
+
+      return tx.kakaoTemplate.update({
+        where: { id: kakaoTemplate.id },
+        data: { status: KakaoTemplateStatus.UPLOADED },
+      });
+    });
+  }
+
+  public async updateMessage(
+    workspaceId: number,
+    messageId: number,
+    dto: UpdateMessageBodyDto,
+  ) {
+    const message = await this.prismaService.messageTemplate.findUnique({
+      where: { id: messageId, workspaceId },
+      include: { kakaoTemplate: true },
+    });
+    if (!message) {
+      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+    }
+
+    const { name, variables, contentGroupId, kakaoTemplate } = dto;
+    return this.prismaService.$transaction(async (tx) => {
+      if (kakaoTemplate)
+        await this.updateKakaoTemplate(tx, message, kakaoTemplate);
+
+      return tx.messageTemplate.update({
+        where: { id: messageId },
+        data: { name, variables: variables || [], contentGroupId },
+      });
+    });
+  }
+
+  private async updateKakaoTemplate(
+    tx: Prisma.TransactionClient,
+    message: Prisma.MessageTemplateGetPayload<{
+      include: { kakaoTemplate: true };
+    }>,
+    dto: UpdateKakaoTemplateBodyDto,
+  ) {
+    if (
+      message.kakaoTemplate.status === KakaoTemplateStatus.APPROVED ||
+      message.kakaoTemplate.status === KakaoTemplateStatus.PENDING
+    ) {
+      throw new NotAcceptableException(
+        '검수 중 또는 검수 완료된 템플릿은 수정할 수 없습니다.',
       );
     }
+
+    const { content, buttons, categoryCode, extra, imageId, imageUrl } = dto;
+    const kakaoTemplateButtons = buttons.map((button) =>
+      this.mapKakaoButton(button),
+    );
+
+    await this.kakaoService.updateKakaoTemplate(
+      message.kakaoTemplate.templateId,
+      {
+        buttons: kakaoTemplateButtons,
+        content,
+        categoryCode,
+        extra,
+        imageId,
+      },
+    );
+
+    await tx.kakaoTemplate.update({
+      where: { id: message.kakaoTemplate.id },
+      data: { content, buttons, categoryCode, extra, imageId, imageUrl },
+    });
+  }
+
+  public async deleteMessage(workspaceId: number, messageId: number) {
+    const message = await this.prismaService.messageTemplate.findUnique({
+      where: { id: messageId, workspaceId },
+      include: { kakaoTemplate: true },
+    });
+    if (!message) {
+      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+    }
+
+    return this.prismaService.$transaction(async (tx) => {
+      await tx.messageTemplate.delete({ where: { id: messageId } });
+      await this.kakaoService.deleteKakaoTemplate(
+        message.kakaoTemplate.templateId,
+      );
+
+      return message;
+    });
+  }
+
+  private mapKakaoButton(button: KakaoTemplateButton): KakaoButton {
+    const baseButton = { buttonType: button.type, buttonName: button.name };
+    if (
+      [
+        KakaoTemplateButtonType.WL,
+        KakaoTemplateButtonType.PR,
+        KakaoTemplateButtonType.RW,
+        KakaoTemplateButtonType.PC,
+      ].includes(button.type)
+    ) {
+      const { url } = button;
+
+      let targetUrl = url;
+      if (button.type === KakaoTemplateButtonType.WL) {
+        targetUrl = url;
+      }
+      if (button.type === KakaoTemplateButtonType.PR) {
+        targetUrl = `https://sluurp.io/order/download/#{이벤트_아이디}`;
+      }
+      if (button.type === KakaoTemplateButtonType.RW) {
+        targetUrl = `https://sluurp.io/order/review/#{이벤트_아이디}`;
+      }
+      if (button.type === KakaoTemplateButtonType.PC) {
+        targetUrl = `https://sluurp.io/order/confirm/#{이벤트_아이디}`;
+      }
+
+      return {
+        ...baseButton,
+        buttonType: KakaoTemplateButtonType.WL,
+        linkMo: targetUrl,
+        linkPc: targetUrl,
+      } as KakaoWebButton;
+    }
+
+    return baseButton as KakaoDefaultButton;
+  }
+
+  public replaceVariables(variables: Variables[], body: any, content: string) {
+    const variableMap = variables.reduce(
+      (map, variable) => {
+        map[variable.key] = variable.value;
+        return map;
+      },
+      {} as Record<string, string>,
+    );
+
+    const regex = /\{(.*?)\}/g;
+    const replacedStr = content.replace(regex, (match, p1) => {
+      const valueName = variableMap[p1];
+      const value = body[valueName];
+      return value !== undefined ? value.toString() : match;
+    });
+
+    return replacedStr;
   }
 }

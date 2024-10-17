@@ -19,6 +19,9 @@ export class WorkspaceService {
     try {
       const workspace = await this.prismaService.workspace.findUnique({
         where: { id, deletedAt: null },
+        include: {
+          subscription: true,
+        },
       });
 
       return workspace;
@@ -235,5 +238,18 @@ export class WorkspaceService {
         '워크스페이스 멤버 조회에 실패했습니다.',
       );
     }
+  }
+
+  public async findWorkspaceSubscription(workspaceId: number) {
+    const workspaceSubscription = await this.prismaService.workspace.findUnique(
+      {
+        where: { id: workspaceId },
+        include: {
+          subscription: true,
+        },
+      },
+    );
+
+    return workspaceSubscription?.subscription;
   }
 }

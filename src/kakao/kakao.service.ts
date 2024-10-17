@@ -8,18 +8,28 @@ import {
 import { ConfigService } from '@nestjs/config';
 import {
   CreateKakaoAlimtalkTemplateRequest,
+  KakaoAlimtalkTemplateMessageType,
   SolapiMessageService,
+  UpdateKakaoAlimtalkTemplateRequest,
 } from 'solapi';
-import { RequestChannelTokenDto } from './dto/request-channel-token.dto';
-import { ConnectChannelDto } from './dto/connect-channel.dto';
 import { createHmac, randomBytes } from 'crypto';
+import { PrismaService } from 'src/prisma/prisma.service';
+import { RequestChannelTokenBodyDto } from './dto/req/request-channel-token-body.dto';
+import { ConnectChannelBodyDto } from './dto/req/connect-channel-body.dto';
+import { firstValueFrom } from 'rxjs';
+import { HttpService } from '@nestjs/axios';
+import sizeOf from 'image-size';
 
 @Injectable()
 export class KakaoService {
   private logger: Logger = new Logger('KakaoService');
   private solapiMessageService: SolapiMessageService;
 
-  constructor(private readonly configService: ConfigService) {
+  constructor(
+    private readonly configService: ConfigService,
+    private readonly prismaService: PrismaService,
+    private readonly httpService: HttpService,
+  ) {
     this.provisionKakaoService();
   }
 
@@ -33,6 +43,14 @@ export class KakaoService {
     } catch (error) {
       this.logger.error(error);
     }
+  }
+
+  public async getKakaoMessageCategories() {
+    return this.solapiMessageService.getKakaoAlimtalkTemplateCategories();
+  }
+
+  public async getKakaoCategories() {
+    return this.solapiMessageService.getKakaoChannelCategories();
   }
 
   public async getKakaoTemplate(templateId: string) {
@@ -55,17 +73,10 @@ export class KakaoService {
   }
 
   public async getCategories() {
-    try {
-      return await this.solapiMessageService.getKakaoChannelCategories();
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '카카오 채널 카테고리 조회에 실패했습니다.',
-      );
-    }
+    return this.solapiMessageService.getKakaoChannelCategories();
   }
 
-  public async requestKakaoChannelToken(dto: RequestChannelTokenDto) {
+  public async requestKakaoChannelToken(dto: RequestChannelTokenBodyDto) {
     try {
       const requestTokenResult =
         await this.solapiMessageService.requestKakaoChannelToken(dto);
@@ -83,12 +94,37 @@ export class KakaoService {
     }
   }
 
-  public async connectKakaoChannel(dto: ConnectChannelDto) {
+  public async connectKakaoChannel(
+    workspaceId: number,
+    dto: ConnectChannelBodyDto,
+  ) {
+    const kakaoCredential = await this.prismaService.kakaoCredential.findUnique(
+      { where: { workspaceId } },
+    );
+    if (kakaoCredential)
+      throw new BadRequestException('이미 카카오 채널이 연동되어 있습니다');
+
+    const kakaoCredentialBySearchId =
+      await this.prismaService.kakaoCredential.findUnique({
+        where: { searchId: dto.searchId },
+      });
+    if (kakaoCredentialBySearchId)
+      throw new BadRequestException(
+        '이미 다른 스토어와 카카오 채널이 연동되어 있습니다',
+      );
+
     try {
       const connectChannelResult =
         await this.solapiMessageService.createKakaoChannel(dto);
 
-      return connectChannelResult;
+      const { channelId, searchId } = connectChannelResult;
+      return this.prismaService.kakaoCredential.create({
+        data: {
+          workspaceId,
+          channelId,
+          searchId,
+        },
+      });
     } catch (error) {
       this.logger.error(error);
       const message = error.message || '카카오 채널 연동에 실패했습니다.';
@@ -101,6 +137,7 @@ export class KakaoService {
       const createTemplateResult =
         await this.solapiMessageService.createKakaoAlimtalkTemplate({
           ...dto,
+          messageType: this.getMessageType(dto),
         });
 
       return createTemplateResult;
@@ -108,6 +145,177 @@ export class KakaoService {
       this.logger.error(error);
       const message = error.message || '카카오 템플릿 생성에 실패했습니다.';
       throw new InternalServerErrorException(message);
+    }
+  }
+
+  public async updateKakaoTemplate(
+    templateId: string,
+    dto: UpdateKakaoAlimtalkTemplateRequest,
+  ) {
+    try {
+      const createTemplateResult =
+        await this.solapiMessageService.updateKakaoAlimtalkTemplate(
+          templateId,
+          {
+            ...dto,
+            messageType: this.getMessageType(dto),
+          },
+        );
+
+      return createTemplateResult;
+    } catch (error) {
+      this.logger.error(error);
+      const message = error.message || '카카오 템플릿 생성에 실패했습니다.';
+      throw new InternalServerErrorException(message);
+    }
+  }
+
+  private getMessageType(
+    dto:
+      | CreateKakaoAlimtalkTemplateRequest
+      | UpdateKakaoAlimtalkTemplateRequest,
+  ) {
+    let messageType: KakaoAlimtalkTemplateMessageType = 'BA';
+
+    const isChannelAddButton = !!dto.buttons.find(
+      (item) => item.buttonType === 'AC',
+    );
+
+    if (isChannelAddButton && dto.extra) {
+      messageType = 'MI';
+    } else if (isChannelAddButton) {
+      messageType = 'AD';
+    } else if (dto.extra) {
+      messageType = 'EX';
+    }
+
+    return messageType;
+  }
+
+  public async requestKakaoTemplateInspection(templateId: string) {
+    try {
+      return await this.solapiMessageService.requestInspectionKakaoAlimtalkTemplate(
+        templateId,
+      );
+    } catch (error) {
+      this.logger.error(error);
+      const message =
+        error.message || '카카오 템플릿 검수 요청에 실패했습니다.';
+      throw new InternalServerErrorException(message);
+    }
+  }
+
+  public async cancelKakaoTemplateInspection(templateId: string) {
+    try {
+      return await this.solapiMessageService.cancelInspectionKakaoAlimtalkTemplate(
+        templateId,
+      );
+    } catch (error) {
+      this.logger.error(error);
+      const message =
+        error.message || '카카오 템플릿 검수 취소에 실패했습니다.';
+      throw new InternalServerErrorException(message);
+    }
+  }
+
+  public async deleteKakaoTemplate(templateId: string) {
+    try {
+      const template = await this.getKakaoTemplate(templateId);
+      if (template.status === 'INSPECTING')
+        await this.cancelKakaoTemplateInspection(templateId); // 검수 취소
+
+      return await this.solapiMessageService.removeKakaoAlimtalkTemplate(
+        templateId,
+      );
+    } catch (error) {
+      this.logger.error(error);
+      const message = error.message || '카카오 템플릿 삭제에 실패했습니다.';
+      throw new InternalServerErrorException(message);
+    }
+  }
+
+  public async findWorkspaceKakao(workspaceId: number) {
+    const kakaoCredential = await this.prismaService.kakaoCredential.findUnique(
+      { where: { workspaceId } },
+    );
+    if (!kakaoCredential)
+      throw new NotFoundException('카카오 채널 연동이 필요합니다.');
+
+    return kakaoCredential;
+  }
+
+  public async deleteKakaoChannel(workspaceId: number) {
+    const kakaoCredential = await this.prismaService.kakaoCredential.findUnique(
+      { where: { workspaceId } },
+    );
+    if (!kakaoCredential)
+      throw new NotFoundException('카카오 채널 연동이 필요합니다.');
+
+    return await this.prismaService.$transaction(async (tx) => {
+      try {
+        await this.solapiMessageService.removeKakaoChannel(
+          kakaoCredential.channelId,
+        );
+
+        await tx.messageTemplate.deleteMany({
+          where: {
+            workspaceId,
+          },
+        });
+
+        return tx.kakaoCredential.delete({
+          where: { id: kakaoCredential.id },
+        });
+      } catch (error) {
+        this.logger.error(error);
+        const message = error.message || '카카오 채널 삭제에 실패했습니다.';
+        throw new InternalServerErrorException(message);
+      }
+    });
+  }
+
+  public async uploadKakaoImage(file: Express.Multer.File) {
+    // file is 2:1 ratio and file size is less than 500KB
+    if (file.size > 500 * 1024)
+      throw new BadRequestException(
+        '이미지 파일 크기는 500KB 이하여야 합니다.',
+      );
+
+    const dimensions = sizeOf(file.buffer);
+    if (dimensions.width / dimensions.height !== 2)
+      throw new BadRequestException('이미지 파일 비율이 2:1이 아닙니다.');
+
+    // 이미지 파일인지 확인
+    if (!file || !file.mimetype.startsWith('image/'))
+      throw new BadRequestException('이미지 파일이 아닙니다.');
+    const base64 = file.buffer.toString('base64');
+
+    const accessToken = this.generateAccessToken();
+    try {
+      // https://developers.solapi.com/references/storage/uploadFile
+      const response = await firstValueFrom(
+        this.httpService.post(
+          '/storage/v1/files',
+          { file: base64, type: 'ATA' },
+          {
+            headers: {
+              Authorization: accessToken,
+            },
+          },
+        ),
+      );
+
+      if (response.status !== 200)
+        throw new InternalServerErrorException('이미지 업로드에 실패했습니다.');
+
+      const { url, fileId } = response.data;
+      return {
+        url,
+        fileId,
+      };
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException('이미지 업로드에 실패했습니다.');
     }
   }
 

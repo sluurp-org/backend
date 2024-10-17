@@ -1,15 +1,17 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
-import { LoginDto } from './dto/login.dto';
+import { LoginDto } from './dto/req/login.dto';
 import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
-import { TokenDto } from './dto/token.dto';
-import { User } from '@prisma/client';
+import { TokenDto } from './dto/res/token.dto';
+import { Provider, User } from '@prisma/client';
+import { NaverService } from 'src/naver/naver.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly naverService: NaverService,
     private readonly userService: UsersService,
     private readonly jwtService: JwtService,
   ) {}
@@ -57,6 +59,36 @@ export class AuthService {
     if (!user) throw new NotFoundException('사용자를 찾을 수 없습니다.');
 
     return user.refreshToken === refreshToken;
+  }
+
+  public async naverLogin(code: string) {
+    const profile = await this.naverService.getProfile(code);
+    const user = await this.userService.findOneByProvider(
+      Provider.NAVER,
+      profile.id,
+    );
+
+    if (!user) {
+      const newUser = await this.userService.createUserByProvider(
+        {
+          email: profile.email,
+          name: profile.name,
+          password: '',
+        },
+        Provider.NAVER,
+        profile.id,
+      );
+
+      const accessToken = this.generateAccessToken(newUser.id);
+      const refreshToken = await this.generateRefreshToken(newUser.id);
+
+      return { accessToken, refreshToken };
+    }
+
+    const accessToken = this.generateAccessToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id);
+
+    return { accessToken, refreshToken };
   }
 
   private generateAccessToken(userId: number): string {

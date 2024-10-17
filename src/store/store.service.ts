@@ -6,69 +6,62 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreateStoreBodyDto } from './dto/create-store-body.dto';
 import { Prisma, StoreType } from '@prisma/client';
-import { UpdateStoreDto } from './dto/update-store.dto';
-import { NcommerceService } from 'src/ncommerce/ncommerce.service';
-import { GetStoreDto } from './dto/get-store.dto';
+import { FindStoreQueryDto } from './dto/req/find-store-query.dto';
+import { CreateStoreBodyDto } from './dto/req/create-store-body.dto';
+import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
+import { SmartstoreService } from 'src/smartstore/smartstore.service';
+import { StoreDto } from './dto/res/store.dto';
+import { SqsService } from '@ssut/nestjs-sqs';
 
 @Injectable()
 export class StoreService {
   private readonly logger = new Logger(StoreService.name);
   constructor(
+    private readonly sqsService: SqsService,
     private readonly prismaService: PrismaService,
-    private readonly ncommerceService: NcommerceService,
+    private readonly smartstoreService: SmartstoreService,
   ) {}
 
-  public async findMany(workspaceId: number, getStoreDto: GetStoreDto) {
-    const { type, enabled, name, skip, take } = getStoreDto;
-    try {
-      const nodes = await this.prismaService.store.findMany({
-        where: {
-          workspaceId,
-          deletedAt: null,
-          type,
-          enabled,
-          name: name && { contains: name },
-        },
-        skip,
-        take,
-      });
-
-      const total = await this.prismaService.store.count({
-        where: {
-          workspaceId,
-          deletedAt: null,
-          type,
-          enabled,
-          name: { contains: name },
-        },
-      });
-      return { nodes, total };
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '스토어 정보를 불러오는데 실패하였습니다.',
-      );
-    }
+  public async findMany(workspaceId: number, findStoreDto: FindStoreQueryDto) {
+    const { type, enabled, name, skip, take } = findStoreDto;
+    return this.prismaService.store.findMany({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        type,
+        enabled,
+        name: name && { contains: name },
+      },
+      skip,
+      take,
+    });
   }
 
-  public async findOne(storeId: number, workspaceId: number) {
-    try {
-      const store = await this.prismaService.store.findUnique({
-        where: { id: storeId, workspaceId, deletedAt: null },
-        include: { smartStoreCredentials: true },
-      });
-      if (!store)
-        throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
+  public async count(workspaceId: number, findStoreDto: FindStoreQueryDto) {
+    const { type, enabled, name } = findStoreDto;
+    return this.prismaService.store.count({
+      where: {
+        workspaceId,
+        deletedAt: null,
+        type,
+        enabled,
+        name: name && { contains: name },
+      },
+    });
+  }
 
-      return store;
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '스토어 정보를 불러오는데 실패하였습니다.',
-      );
-    }
+  public async findOne(
+    storeId: number,
+    workspaceId: number,
+  ): Promise<StoreDto> {
+    const store = await this.prismaService.store.findUnique({
+      where: { id: storeId, workspaceId, deletedAt: null },
+      include: { smartStoreCredentials: true },
+    });
+    if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
+
+    return store;
   }
 
   public async findOneByWorkspaceId(workspaceId: number) {
@@ -107,16 +100,10 @@ export class StoreService {
     if (type === StoreType.SMARTSTORE) {
       const { applicationId, applicationSecret } = smartStoreCredentials;
 
-      const storeInfo = await this.ncommerceService.getStoreInfo(
+      const storeInfo = await this.smartstoreService.getStoreInfo(
         applicationId,
         applicationSecret,
       );
-      const storeExists =
-        await this.prismaService.smartStoreCredentials.findUnique({
-          where: { channelId: storeInfo.channelId, deletedAt: null },
-        });
-      if (storeExists)
-        throw new BadRequestException('이미 등록된 스마트스토어 입니다.');
 
       storeData.smartStoreCredentials = {
         create: {
@@ -145,7 +132,7 @@ export class StoreService {
   public async update(
     workspaceId: number,
     storeId: number,
-    updateStoreDto: UpdateStoreDto,
+    updateStoreDto: UpdateStoreBodyDto,
   ) {
     const store = await this.prismaService.store.findUnique({
       where: { id: storeId, workspaceId },
@@ -158,10 +145,11 @@ export class StoreService {
 
     if (smartStoreCredentials && store.smartStoreCredentials) {
       const { applicationId, applicationSecret } = smartStoreCredentials;
-      const storeInfo = await this.ncommerceService.getStoreInfo(
+      const storeInfo = await this.smartstoreService.getStoreInfo(
         applicationId,
         applicationSecret,
       );
+      console.log(storeInfo);
       if (storeInfo.channelId !== store.smartStoreCredentials.channelId)
         throw new BadRequestException(
           '변경하려는 스마트스토어 정보가 일치하지 않습니다.',
@@ -195,25 +183,21 @@ export class StoreService {
     });
     if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
 
-    try {
-      const deletedStore = await this.prismaService.store.update({
+    return await this.prismaService.$transaction(async (tx) => {
+      const deletedStore = await tx.store.update({
         where: { id: storeId },
         data: {
           deletedAt: new Date(),
-          smartStoreCredentials: store.smartStoreCredentials
-            ? { update: { deletedAt: new Date() } }
-            : undefined,
         },
         include: { smartStoreCredentials: true },
       });
 
+      await tx.smartStoreCredentials.delete({
+        where: { id: store.smartStoreCredentials.id },
+      });
+
       return deletedStore;
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '스토어 정보를 삭제하는데 실패하였습니다.',
-      );
-    }
+    });
   }
 
   public async syncProduct(workspaceId: number, storeId: number) {
@@ -227,49 +211,51 @@ export class StoreService {
       const { applicationId, applicationSecret } = store.smartStoreCredentials;
 
       try {
-        const syncResponse = await this.ncommerceService.getProducts(
+        const syncResponse = await this.smartstoreService.getProducts(
           applicationId,
           applicationSecret,
         );
 
-        await this.prismaService.$transaction(
-          syncResponse.map((product) => {
-            const { originProductNo, channelProducts } = product;
-            const productInfo = channelProducts.find(
-              (channelProduct) =>
-                channelProduct.originProductNo === originProductNo,
-            );
-            if (!productInfo) return;
+        return await this.prismaService.$transaction(async (tx) => {
+          await Promise.all(
+            syncResponse.map((product) => {
+              const { originProductNo, channelProducts } = product;
+              const productInfo = channelProducts.find(
+                (channelProduct) =>
+                  channelProduct.originProductNo === originProductNo,
+              );
+              if (!productInfo) return;
 
-            const {
-              name,
-              representativeImage: { url },
-            } = productInfo;
-            return this.prismaService.product.upsert({
-              where: {
-                productId_storeId: {
-                  productId: originProductNo.toString(),
-                  storeId: storeId,
+              const {
+                name,
+                representativeImage: { url },
+              } = productInfo;
+              return tx.product.upsert({
+                where: {
+                  productId_storeId: {
+                    productId: originProductNo.toString(),
+                    storeId: storeId,
+                  },
                 },
-              },
-              create: {
-                workspace: { connect: { id: workspaceId } },
-                productId: originProductNo.toString(),
-                store: { connect: { id: storeId } },
-                name,
-                productImage: url,
-              },
-              update: {
-                name,
-                productImage: url,
-              },
-            });
-          }),
-        );
+                create: {
+                  workspace: { connect: { id: workspaceId } },
+                  productId: originProductNo.toString(),
+                  store: { connect: { id: storeId } },
+                  name,
+                  productImage: url,
+                },
+                update: {
+                  name,
+                  productImage: url,
+                },
+              });
+            }),
+          );
 
-        await this.prismaService.store.update({
-          where: { id: storeId },
-          data: { lastProductSyncAt: new Date() },
+          return await tx.store.update({
+            where: { id: storeId },
+            data: { lastProductSyncAt: new Date() },
+          });
         });
       } catch (error) {
         if (error.status) throw error;
@@ -285,54 +271,58 @@ export class StoreService {
     }
   }
 
-  public async syncOption(
-    workspaceId: number,
-    storeId: number,
-    productId: number,
-  ) {
-    const store = await this.prismaService.store.findUnique({
-      where: { id: storeId, workspaceId, deletedAt: null },
-      include: { smartStoreCredentials: true },
-    });
-    if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
-
+  public async syncOption(workspaceId: number, productId: number) {
     const product = await this.prismaService.product.findUnique({
-      where: { id: productId },
+      where: {
+        id: productId,
+        store: { workspaceId },
+      },
+      include: {
+        store: {
+          include: { smartStoreCredentials: true },
+        },
+      },
     });
     if (!product) throw new NotFoundException('상품 정보를 찾을 수 없습니다.');
 
-    if (store.type === StoreType.SMARTSTORE && store.smartStoreCredentials) {
-      const { applicationId, applicationSecret } = store.smartStoreCredentials;
+    if (
+      product.store.type === StoreType.SMARTSTORE &&
+      product.store.smartStoreCredentials
+    ) {
+      const { applicationId, applicationSecret } =
+        product.store.smartStoreCredentials;
 
       try {
-        const syncResponse = await this.ncommerceService.getProductOptions(
+        const syncResponse = await this.smartstoreService.getProductOptions(
           applicationId,
           applicationSecret,
           product.productId,
         );
 
-        await this.prismaService.$transaction(
-          syncResponse.map((option) => {
-            const { id, name } = option;
-            return this.prismaService.productVariant.upsert({
-              where: {
-                variantId_productId: {
-                  variantId: id.toString(),
-                  productId: product.id,
+        await this.prismaService.$transaction(async (tx) => {
+          return await Promise.all(
+            syncResponse.map((option) => {
+              const { id, name } = option;
+              return tx.productVariant.upsert({
+                where: {
+                  variantId_productId: {
+                    variantId: id.toString(),
+                    productId: product.id,
+                  },
                 },
-              },
-              create: {
-                product: { connect: { id: product.id } },
-                variantId: id.toString(),
-                name,
-              },
-              update: {
-                variantId: id.toString(),
-                name,
-              },
-            });
-          }),
-        );
+                create: {
+                  product: { connect: { id: product.id } },
+                  variantId: id.toString(),
+                  name,
+                },
+                update: {
+                  variantId: id.toString(),
+                  name,
+                },
+              });
+            }),
+          );
+        });
       } catch (error) {
         if (error.status) throw error;
 
@@ -352,5 +342,36 @@ export class StoreService {
       where: { id: storeId },
       data: { lastOrderSyncAt },
     });
+  }
+
+  public async sendStoreToSqs() {
+    const stores = await this.prismaService.store.findMany({
+      where: {
+        enabled: true,
+        type: StoreType.SMARTSTORE,
+        smartStoreCredentials: {
+          isNot: null,
+        },
+      },
+      include: { smartStoreCredentials: true },
+    });
+
+    const sqsPayload = stores.map((store) => ({
+      id: store.id.toString() + new Date().getTime().toString(),
+      body: JSON.stringify({
+        payload: {
+          applicationId: store.smartStoreCredentials.applicationId,
+          applicationSecret: store.smartStoreCredentials.applicationSecret,
+          emailParseable: store.smartStoreCredentials.emailParseable,
+        },
+        lastSyncedAt: store.lastOrderSyncAt,
+        provider: 'SMARTSTORE',
+        storeId: store.id,
+      }),
+    }));
+
+    console.log(`Sending ${sqsPayload.length} messages to SQS`);
+    await this.sqsService.send('commerce', sqsPayload);
+    console.log('Messages sent to SQS');
   }
 }

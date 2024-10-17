@@ -1,19 +1,36 @@
-import { Body, Controller, Get, Param, Post, Query } from '@nestjs/common';
+import {
+  UseGuards,
+  Body,
+  Controller,
+  Get,
+  Param,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkerAuth } from 'src/auth/decorators/worker-auth.decorator';
 import { WorkerService } from './worker.service';
-import { FindOrdersDto } from 'src/order/dto/req/find-batch.dto';
-import { UpdateOrdersDto } from 'src/order/dto/req/upsert-batch.dto';
-import { FindOrderBatchResponseDto } from 'src/order/dto/res/find-batch-response.dto';
-import { GetTokenQueryDto } from 'src/ncommerce/dto/get-token-query.dto';
-import { UpdateLastFetchStoreDto } from 'src/store/dto/update-last-fetch-store.dto';
-import { FindOrderQueryDto } from 'src/order/dto/req/find-order-query.dto';
+import { FindTokenQueryDto } from 'src/smartstore/dto/find-token-query.dto';
+import { UpdateLastFetchStoreDto } from 'src/store/dto/req/update-last-fetch-store.dto';
+import { FindOrdersBatchBodyDto } from 'src/order/dto/req/find-orders-batch-body.dto';
+import { FindOrdersBatchResponseDto } from 'src/order/dto/res/find-orders-batch-response.dto';
+import { UpsertOrdersBatchBodyDto } from 'src/order/dto/req/upsert-orders-batch-body.dto';
+import { UpsertOrdersBatchResponseDto } from 'src/order/dto/res/upsert-orders-batch-response.dto';
+import { FindOrderBatchQueryDto } from 'src/order/dto/req/find-order-batch-query.dto';
+import { OrderDto } from 'src/order/dto/res/order.dto';
+import { KakaoTemplateStatusBodyDto } from './dto/req/kakao-template-status-body.dto';
+import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.dto';
+import { PurchaseService } from 'src/purchase/purchase.service';
+import { PortoneGuard } from 'src/portone/gurad/portone.guard';
+import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
 
 @ApiTags('worker')
 @Controller('worker')
-@WorkerAuth()
 export class WorkerController {
-  constructor(private readonly workerService: WorkerService) {}
+  constructor(
+    private readonly workerService: WorkerService,
+    private readonly purchaseService: PurchaseService,
+  ) {}
 
   @ApiOperation({
     summary: '주문 조회',
@@ -22,11 +39,12 @@ export class WorkerController {
   @ApiResponse({
     status: 200,
     description: '주문 조회 성공',
-    type: [FindOrderBatchResponseDto],
+    type: [OrderDto],
   })
   @Get('order')
-  public async getOrders(@Query() dto: FindOrderQueryDto) {
-    return await this.workerService.getOrders(dto);
+  @WorkerAuth()
+  public async getOrders(@Query() dto: FindOrderBatchQueryDto) {
+    return await this.workerService.findOrdersByBatchQuery(dto);
   }
 
   @ApiOperation({
@@ -36,20 +54,27 @@ export class WorkerController {
   @ApiResponse({
     status: 200,
     description: '주문 배치 조회 성공',
-    type: [FindOrderBatchResponseDto],
+    type: [FindOrdersBatchResponseDto],
   })
   @Post('order/find')
-  public async findOrders(@Body() batchDto: FindOrdersDto) {
-    return await this.workerService.findOrders(batchDto);
+  @WorkerAuth()
+  public async findOrders(@Body() batchDto: FindOrdersBatchBodyDto) {
+    return await this.workerService.findOrdersByBatchBody(batchDto);
   }
 
   @ApiOperation({
     summary: '신규 주문 배치 업데이트',
     description: '신규 주문을 배치로 업데이트 합니다.',
   })
-  @Post('order/update')
-  public async updateOrders(@Body() batchDto: UpdateOrdersDto) {
-    return await this.workerService.updateOrders(batchDto);
+  @ApiResponse({
+    status: 200,
+    description: '신규 주문 배치 업데이트 성공',
+    type: [UpsertOrdersBatchResponseDto],
+  })
+  @Post('order/upsert')
+  @WorkerAuth()
+  public async upsertOrders(@Body() batchDto: UpsertOrdersBatchBodyDto) {
+    return await this.workerService.upsertOrders(batchDto);
   }
 
   @ApiOperation({
@@ -61,9 +86,10 @@ export class WorkerController {
     description: '네이버 커머스 토큰 조회 성공',
     type: String,
   })
-  @Get('ncommerce/token')
-  public async getAccessToken(@Query() dto: GetTokenQueryDto) {
-    return await this.workerService.getNcommerceToken(dto);
+  @Get('smartstore/token')
+  @WorkerAuth()
+  public async findAccessToken(@Query() dto: FindTokenQueryDto) {
+    return await this.workerService.findSmartstoreToken(dto);
   }
 
   @ApiOperation({
@@ -71,6 +97,7 @@ export class WorkerController {
     description: '스토어의 마지막 조회 시간을 업데이트합니다.',
   })
   @Post('store/:storeId/sync')
+  @WorkerAuth()
   public async updateStoreLastSyncedAt(
     @Param('storeId') storeId: number,
     @Body() { lastSyncedAt }: UpdateLastFetchStoreDto,
@@ -79,5 +106,40 @@ export class WorkerController {
       storeId,
       lastSyncedAt,
     );
+  }
+
+  @ApiOperation({
+    summary: '스토어 크론 웹훅',
+    description: '스토어 크론 웹훅을 처리합니다.',
+  })
+  @Post('store/cron')
+  @WorkerAuth()
+  public async sendStoreCronJob() {
+    return await this.workerService.sendStoreCronJob();
+  }
+
+  @ApiOperation({
+    summary: '솔라피 카카오 템플릿 상태 변경 웹훅',
+    description: '솔라피 카카오 템플릿 상태 변경 웹훅을 처리합니다.',
+  })
+  @Post('solapi/kakao/template')
+  @WorkerAuth()
+  public async handleSolapiKakaoTemplateStatusWebhook(
+    @Body() dto: KakaoTemplateStatusBodyDto,
+  ) {
+    return await this.workerService.handleSolapiKakaoTemplateStatusWebhook(dto);
+  }
+
+  @Post('solapi/message')
+  public async handleSolapiMessageWebhook(
+    @Body() dto: SolapiMessageStatuBodyDto[],
+  ) {
+    return await this.workerService.handleSolapiMessageWebhook(dto);
+  }
+
+  @Post('portone/webhook')
+  @UseGuards(PortoneGuard)
+  public async webhook(@Body() dto: WebhookBodyDto) {
+    return this.purchaseService.webhook(dto);
   }
 }

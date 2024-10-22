@@ -11,16 +11,16 @@ phases:
     commands:
       - echo Installing dependencies...
       - corepack enable
-      - pnpm -v
-      - pnpm install --frozen-lockfile
+      - yarn -v
+      - yarn
   pre_build:
     commands:
       - echo Generating Prisma client...
-      - pnpm prisma:generate
+      - yarn prisma:generate
   build:
     commands:
       - echo Build started on `date`
-      - pnpm build
+      - yarn build
   post_build:
     commands:
       - echo Deploying migrations...
@@ -31,6 +31,6 @@ artifacts:
     - dist/**/*
     - package-lock.json
     - package.json
-    - pnpm-lock.yaml
+    - yarn.lock
     - prisma/**/*
     - node_modules/**/*

@@ -18,6 +18,11 @@ async function bootstrap() {
     }),
   );
 
+  app.enableCors({
+    credentials: true,
+    origin: 'https://sluurp.io',
+  });
+
   app.useGlobalInterceptors(new PostStatusInterceptor());
   app.useGlobalFilters(
     new HttpExceptionFilter(),

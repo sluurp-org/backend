@@ -24,7 +24,7 @@ phases:
   post_build:
     commands:
       - echo Deploying migrations...
-      - yarn prisma:deploy
+      - yarn prisma:migrate
       - echo Build completed on `date`
 
 artifacts:

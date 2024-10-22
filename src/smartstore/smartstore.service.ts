@@ -7,7 +7,7 @@ import {
   Logger,
   NotFoundException,
 } from '@nestjs/common';
-import { hashSync } from 'bcrypt';
+import { hashSync } from 'bcryptjs';
 import { firstValueFrom } from 'rxjs';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Content, ProductResponse } from './interfaces/products.interface';

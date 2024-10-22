@@ -1,0 +1,34 @@
+version: 0.2
+
+env:
+  variables:
+    NODE_ENV: 'prod'
+
+phases:
+  install:
+    runtime-versions:
+      nodejs: 20
+    commands:
+      - echo Installing dependencies...
+      - pnpm -v
+      - pnpm install --frozen-lockfile
+  pre_build:
+    commands:
+      - echo Generating Prisma client...
+      - pnpx prisma generate
+  build:
+    commands:
+      - echo Build started on `date`
+      - pnpm build
+  post_build:
+    commands:
+      - echo Deploying migrations...
+      - echo Build completed on `date`
+
+artifacts:
+  files:
+    - dist/**/*
+    - package-lock.json
+    - package.json
+    - pnpm-lock.yaml
+    - prisma/**/*

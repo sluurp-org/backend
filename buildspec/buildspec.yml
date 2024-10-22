@@ -16,7 +16,7 @@ phases:
   pre_build:
     commands:
       - echo Generating Prisma client...
-      - pnpx prisma generate
+      - pnpm prisma:generate
   build:
     commands:
       - echo Build started on `date`

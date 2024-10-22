@@ -20,7 +20,7 @@ async function bootstrap() {
 
   app.enableCors({
     credentials: true,
-    origin: 'https://sluurp.io',
+    origin: ['https://sluurp.io', 'http://localhost:3001'],
   });
 
   app.useGlobalInterceptors(new PostStatusInterceptor());
@@ -28,10 +28,6 @@ async function bootstrap() {
     new HttpExceptionFilter(),
     new PrismaClientExceptionFilter(),
   );
-  app.enableCors({
-    origin: 'http://localhost:3001',
-    credentials: true,
-  });
 
   const documentBuilder = new DocumentBuilder()
     .setTitle('Slurp API')

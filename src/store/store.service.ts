@@ -348,6 +348,7 @@ export class StoreService {
     const stores = await this.prismaService.store.findMany({
       where: {
         enabled: true,
+        readonly: false,
         type: StoreType.SMARTSTORE,
         smartStoreCredentials: {
           isNot: null,

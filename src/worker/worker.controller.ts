@@ -74,6 +74,7 @@ export class WorkerController {
   @Post('order/upsert')
   @WorkerAuth()
   public async upsertOrders(@Body() batchDto: UpsertOrdersBatchBodyDto) {
+    console.log(batchDto);
     return await this.workerService.upsertOrders(batchDto);
   }
 

@@ -318,21 +318,32 @@ export class OrderService {
     type: OrderStatus,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
-    const productVariantIdQuery = productVariantId
-      ? { in: [null, productVariantId] }
-      : null;
-
-    return transaction.event.findMany({
+    const events = await transaction.event.findMany({
       where: {
         workspaceId,
-        productId,
-        productVariantId: productVariantIdQuery,
         type,
+        product: { id: productId, deletedAt: null },
+        OR: [
+          {
+            productVariant: productVariantId
+              ? { id: productVariantId, deletedAt: null }
+              : null,
+          },
+          { productVariant: null },
+        ],
+        message: {
+          readonly: false,
+        },
       },
       include: {
         message: { include: { contentGroup: true } },
       },
     });
+
+    return events.filter(
+      (event) =>
+        !event.message.contentGroup?.readonly || !event.message.contentGroup,
+    );
   }
 
   private async processBatchUpdateOrder(
@@ -448,7 +459,10 @@ export class OrderService {
 
         const failedUpdatedOrders = updatedOrders
           .filter((result) => result.status === 'rejected')
-          .map((result) => result.reason);
+          .map((result) => {
+            console.log(result);
+            return result.reason;
+          });
 
         if (failedUpdatedOrders.length > 0) {
           this.logger.error(failedUpdatedOrders);

@@ -75,7 +75,8 @@ model Workspace {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  subscriptionId Int?
+  subscriptionId      Int?
+  subscriptionEndedAt DateTime?
 
   subscription SubscriptionModel? @relation(fields: [subscriptionId], references: [id])
 
@@ -92,6 +93,7 @@ model Workspace {
   workspaceCredit  WorkspaceCredit[]
   purchaseHistory  PurchaseHistory[]
   workspaceBilling WorkspaceBilling[]
+  EventHistory     EventHistory[]
 }
 
 model WorkspaceBilling {
@@ -409,12 +411,16 @@ model Event {
 }
 
 model EventHistory {
-  id             String @id @default(uuid())
-  eventId        Int
-  orderId        Int
-  orderHistoryId Int?
-  contentId      Int?
-  creditId       Int?
+  id          String @id @default(uuid())
+  workspaceId Int
+  eventId     Int?
+  orderId     Int?
+  contentId   Int?
+  messageId   Int?
+  creditId    Int?
+
+  messageContent   String? @db.LongText
+  messageVariables Json?
 
   expiredAt       DateTime?
   downloadCount   Int       @default(0)
@@ -430,17 +436,22 @@ model EventHistory {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  credit       WorkspaceCredit? @relation(fields: [creditId], references: [id])
-  content      Content?         @relation(fields: [contentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
-  event        Event            @relation(fields: [eventId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  order        Order            @relation(fields: [orderId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  orderHistory OrderHistory[]
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
+  credit          WorkspaceCredit? @relation(fields: [creditId], references: [id])
+  content         Content?         @relation(fields: [contentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
+  event           Event?           @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  order           Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  messageTemplate MessageTemplate? @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orderHistory    OrderHistory[]
 }
 
 enum EventStatus {
-  PROCESSING
-  SUCCESS
-  FAIL
+  PENDING // 발송 준비 중
+  CONTENT_READY // 컨텐츠 준비 완료
+  READY // 발송 준비 완료
+  PROCESSING // 발송 중 (SOLAPI 응답 대기 또는 이메일)
+  SUCCESS // 발송 완료
+  FAILED // 발송 실패
 }
 
 model MessageTemplate {
@@ -460,9 +471,10 @@ model MessageTemplate {
   workspace     Workspace      @relation(fields: [workspaceId], references: [id])
   contentGroup  ContentGroup?  @relation(fields: [contentGroupId], references: [id])
 
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-  event     Event[]
+  createdAt    DateTime       @default(now())
+  updatedAt    DateTime       @default(now()) @updatedAt
+  event        Event[]
+  EventHistory EventHistory[]
 }
 
 model KakaoTemplate {

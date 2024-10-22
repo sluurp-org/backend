@@ -25,7 +25,6 @@ import { CommandModule } from 'nestjs-command';
 import { IsBcryptHashConstraint } from './common/validator/hash.validator';
 import { NaverModule } from './naver/naver.module';
 import { CreditModule } from './credit/credit.module';
-import { FileModule } from './file/file.module';
 import { IsVariableConstraint } from './common/validator/variable.validator';
 import { EventModule } from './event/event.module';
 import { SqsModule } from '@ssut/nestjs-sqs';
@@ -34,6 +33,7 @@ import { AwsModule } from './aws/aws.module';
 import { PortoneModule } from './portone/portone.module';
 import { MailModule } from './mail/mail.module';
 import { EventHistoryModule } from './event-history/event-history.module';
+import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
 
 @Module({
   imports: [
@@ -73,13 +73,13 @@ import { EventHistoryModule } from './event-history/event-history.module';
     CommandModule,
     NaverModule,
     CreditModule,
-    FileModule,
     EventModule,
     PurchaseModule,
     AwsModule,
     PortoneModule,
     MailModule,
     EventHistoryModule,
+    EventHistoryWorkspaceModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

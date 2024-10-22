@@ -1,5 +1,12 @@
 import { Injectable, NotAcceptableException } from '@nestjs/common';
-import { EventStatus, KakaoTemplateStatus, Order, Store } from '@prisma/client';
+import {
+  EventStatus,
+  KakaoTemplateStatus,
+  Order,
+  Prisma,
+  Store,
+  StoreType,
+} from '@prisma/client';
 import { FindTokenQueryDto } from 'src/smartstore/dto/find-token-query.dto';
 import { SmartstoreService } from 'src/smartstore/smartstore.service';
 import { FindOrderBatchQueryDto } from 'src/order/dto/req/find-order-batch-query.dto';
@@ -97,9 +104,9 @@ export class WorkerService {
   }
 
   public async handleSolapiMessageWebhook(dto: SolapiMessageStatuBodyDto[]) {
-    return await this.prismaService.$transaction(async (tx) => {
-      return await Promise.allSettled(
-        dto.map(async (payload) => {
+    const events = await Promise.allSettled(
+      dto.map(async (payload) => {
+        return await this.prismaService.$transaction(async (tx) => {
           const {
             customFields: { eventId },
             dateProcessed,
@@ -110,15 +117,28 @@ export class WorkerService {
           const event = await tx.eventHistory.findUnique({
             where: { id: eventId },
             include: {
-              order: true,
+              order: {
+                include: {
+                  store: {
+                    include: {
+                      smartStoreCredentials: true,
+                    },
+                  },
+                },
+              },
               credit: true,
+              event: {
+                include: {
+                  message: true,
+                },
+              },
             },
           });
           if (!event)
             throw new NotAcceptableException('이벤트를 찾을 수 없습니다.');
 
           if (statusCode === '4000') {
-            return await tx.eventHistory.update({
+            const updatedEventHistory = await tx.eventHistory.update({
               where: { id: eventId },
               data: {
                 status: EventStatus.SUCCESS,
@@ -127,34 +147,117 @@ export class WorkerService {
                 solapiStatusCode: statusCode,
               },
             });
+
+            return {
+              event,
+              success: true,
+              isUpdateDelivery: event.event.message.completeDelivery,
+              updatedEventHistory,
+            };
           }
 
           if (event.credit) {
-            await this.creditService.create(event.order.workspaceId, {
-              amount: event.credit.amount,
-              reason: '메세지 미발송건 환불',
-            });
+            await this.creditService.create(
+              event.order.workspaceId,
+              {
+                amount: event.credit.amount,
+                reason: '메세지 미발송건 환불',
+              },
+              tx,
+            );
           }
 
           if (event.contentId) {
-            await this.prismaService.content.update({
+            await tx.content.update({
               where: { id: event.contentId },
               data: { used: false },
             });
           }
 
-          return await this.prismaService.eventHistory.update({
+          const updatedEventHistory = await tx.eventHistory.update({
             where: { id: eventId },
             data: {
-              status: EventStatus.FAIL,
+              status: EventStatus.FAILED,
               processedAt: dateProcessed,
               solapiMessageId: messageId,
               solapiStatusCode: statusCode,
             },
           });
-        }),
-      );
-    });
+
+          return {
+            event,
+            success: false,
+            isUpdateDelivery: event.event.message.completeDelivery,
+            updatedEventHistory,
+          };
+        });
+      }),
+    );
+
+    const completedEvents = events
+      .filter((event) => event.status === 'fulfilled')
+      .filter((event) => event.value.success)
+      .filter((event) => event.value.isUpdateDelivery)
+      .map((event) => event.value.event);
+
+    await this.completeDelivery(completedEvents);
+  }
+
+  private async completeDelivery(
+    events: Prisma.EventHistoryGetPayload<{
+      include: {
+        order: {
+          include: { store: { include: { smartStoreCredentials: true } } };
+        };
+      };
+    }>[],
+  ) {
+    // group by store id, and return productOrderId, type, dateProcessed
+    const eventHistoryGroupByStore = events.reduce<
+      Record<
+        number,
+        {
+          type: StoreType;
+          applicationId: string;
+          applicationSecret: string;
+          events: Prisma.EventHistoryGetPayload<{
+            include: { order: true };
+          }>[];
+        }
+      >
+    >((acc, event) => {
+      const storeId = event.order.store.id;
+      if (!acc[storeId]) {
+        acc[storeId] = {
+          type: event.order.store.type,
+          applicationId: event.order.store.smartStoreCredentials.applicationId,
+          applicationSecret:
+            event.order.store.smartStoreCredentials.applicationSecret,
+          events: [],
+        };
+      }
+
+      acc[storeId].events.push(event);
+      return acc;
+    }, {});
+
+    await Promise.allSettled(
+      Object.values(eventHistoryGroupByStore).map(
+        ({ type, applicationId, applicationSecret, events }) => {
+          if (type !== StoreType.SMARTSTORE)
+            throw new NotAcceptableException(
+              '배송 처리는 스마트스토어에서만 가능합니다.',
+            );
+
+          return this.smartstoreService.completeDelivery(
+            applicationId,
+            applicationSecret,
+            events.map((event) => event.order.productOrderId),
+            events[0].processedAt,
+          );
+        },
+      ),
+    );
   }
 
   public async sendStoreCronJob() {

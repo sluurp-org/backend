@@ -1,12 +1,12 @@
 import {
   Injectable,
   InternalServerErrorException,
+  Logger,
   NotAcceptableException,
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { CreditService } from 'src/credit/credit.service';
-import { ConfigService } from '@nestjs/config';
 import { PortoneService } from 'src/portone/portone.service';
 import {
   Prisma,
@@ -30,11 +30,11 @@ export class PurchaseService {
   private readonly FREE_TRIAL_DAYS = 7;
   private readonly MAX_RETRY_COUNT = 1;
   private readonly RETRY_HOUR = 2;
+  private readonly logger = new Logger(PurchaseService.name);
 
   constructor(
     private readonly prismaService: PrismaService,
     private readonly creditService: CreditService,
-    private readonly configService: ConfigService,
     private readonly portoneService: PortoneService,
   ) {}
 
@@ -1126,8 +1126,9 @@ export class PurchaseService {
           throw new NotAcceptableException('크레딧 결제가 아닙니다.');
 
         if (
-          purchase.status === PurchaseStatus.PAID &&
-          paymentResult.status === PurchaseStatus.PAID
+          (purchase.status === PurchaseStatus.PAID &&
+            paymentResult.status === PurchaseStatus.PAID) ||
+          purchase.creditId
         )
           throw new NotAcceptableException('이미 결제 완료된 주문입니다.');
 
@@ -1227,15 +1228,19 @@ export class PurchaseService {
       data: { billingKey, paymentId },
     } = dto;
 
-    switch (type) {
-      case WebhookTypeEnum.BillingKeyDeleted:
-        return this.handleWebhookBillingKeyDeleted(billingKey);
-      case WebhookTypeEnum.TransactionPaid:
-        return this.handleWebhookPaymentCompleted(paymentId);
-      case WebhookTypeEnum.TransactionFailed:
-        return this.handleWebhookPaymentFailed(paymentId);
-      default:
-        return true;
+    try {
+      switch (type) {
+        case WebhookTypeEnum.BillingKeyDeleted:
+          return this.handleWebhookBillingKeyDeleted(billingKey);
+        case WebhookTypeEnum.TransactionPaid:
+          return this.handleWebhookPaymentCompleted(paymentId);
+        case WebhookTypeEnum.TransactionFailed:
+          return this.handleWebhookPaymentFailed(paymentId);
+        default:
+          return true;
+      }
+    } catch (error) {
+      this.logger.error(error);
     }
   }
 }

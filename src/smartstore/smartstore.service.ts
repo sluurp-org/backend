@@ -22,6 +22,34 @@ export class SmartstoreService {
     private readonly prismaService: PrismaService,
   ) {}
 
+  public async completeDelivery(
+    applicationId: string,
+    applicationSecret: string,
+    productOrderIds: string[],
+    dateProcessed: Date,
+  ) {
+    const accessToken = await this.findAccessToken(
+      applicationId,
+      applicationSecret,
+    );
+
+    try {
+      await this.httpService.post(
+        '/v1/pay-order/seller/product-orders/dispatch',
+        {
+          dispatchProductOrders: productOrderIds.map((productOrderId) => ({
+            productOrderId,
+            deliveryMethod: 'DIRECT_DELIVERY',
+            dispatchDate: dateProcessed.toISOString(),
+          })),
+        },
+        { headers: { Authorization: `Bearer ${accessToken}` } },
+      );
+    } catch (error) {
+      this.logger.error(error);
+    }
+  }
+
   public async getProductOptions(
     applicationId: string,
     applicationSecret: string,

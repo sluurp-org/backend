@@ -1,11 +1,16 @@
-import { Injectable } from '@nestjs/common';
+import { Injectable, Logger } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FindEventQueryDto } from './dto/req/find-event-query.dto';
 import { CreateEventBodyDto } from './dto/req/create-event-body.dto';
 import { UpdateEventBodyDto } from './dto/req/update-event-body.dto';
 import { FindEventHistoryQueryDto } from './dto/req/find-event-history-query.dto';
-import { EventStatus, Order, OrderHistoryType, Prisma } from '@prisma/client';
-import { SqsService } from '@ssut/nestjs-sqs';
+import {
+  EventStatus,
+  Order,
+  OrderHistoryType,
+  Prisma,
+  Variables,
+} from '@prisma/client';
 import { MessageService } from 'src/message/message.service';
 import { CreditService } from 'src/credit/credit.service';
 import { ContentService } from 'src/content/content.service';
@@ -13,10 +18,11 @@ import { WorkspaceService } from 'src/workspace/workspace.service';
 
 @Injectable()
 export class EventService {
+  private readonly logger = new Logger(EventService.name);
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly messageService: MessageService,
-    private readonly sqsService: SqsService,
     private readonly creditService: CreditService,
     private readonly contentService: ContentService,
     private readonly workspaceService: WorkspaceService,
@@ -140,15 +146,51 @@ export class EventService {
     });
   }
 
+  // private async createMessageBody(
+  //   order: Prisma.OrderGetPayload<{
+  //     include: {
+  //       product: true;
+  //       productVariant: true;
+  //       store: true;
+  //     };
+  //   }>,
+  //   variables: Variables[],
+  //   // messageVariables: MessageVariab[],
+  // ) {
+  //   const { product, productVariant, store, ...orderRest } = order;
+  //   const variableBody = {
+  //     storeName: store.name,
+  //     eventId: order.eventHistory,
+  //     productName: product?.name,
+  //     productVariantName: productVariant?.name,
+  //     ...orderRest,
+  //   };
+  // }
+
   private async createEventHistoryInput(
     order: Order,
     event: Prisma.EventGetPayload<{
       include: { message: { include: { contentGroup: true } } };
     }>,
     transaction: Prisma.TransactionClient = this.prismaService,
-  ): Promise<Prisma.EventHistoryCreateInput> {
+  ): Promise<
+    Pick<
+      Prisma.EventHistoryCreateInput,
+      | 'event'
+      | 'order'
+      | 'credit'
+      | 'content'
+      | 'expiredAt'
+      | 'status'
+      | 'message'
+      | 'messageTemplate'
+    >
+  > {
     const { id: orderId, receiverPhone, workspaceId } = order;
-    const { id: eventId, message } = event;
+    const {
+      id: eventId,
+      message: { id: messageId, contentGroup },
+    } = event;
 
     const workspaceSubscription =
       await this.workspaceService.findWorkspaceSubscription(workspaceId);
@@ -157,20 +199,16 @@ export class EventService {
       return {
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
-        status: EventStatus.FAIL,
+        status: EventStatus.FAILED,
         message: '워크스페이스 구독 정보를 찾을 수 없습니다.',
       };
     }
 
     const { contentCredit, alimTalkCredit } = workspaceSubscription;
 
-    if (message?.contentGroup) {
+    if (contentGroup) {
       try {
-        const {
-          id: contentGroupId,
-          expireMinute,
-          oneTime,
-        } = message.contentGroup;
+        const { id: contentGroupId, expireMinute, oneTime } = contentGroup;
 
         const content = await this.contentService.findAvailableContent(
           contentGroupId,
@@ -191,18 +229,19 @@ export class EventService {
         expireAt.setMinutes(expireAt.getMinutes() + expireMinute);
 
         return {
+          messageTemplate: { connect: { id: messageId } },
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
           credit: { connect: { id: usedCredit.id } },
           content: { connect: { id: contentId } },
           expiredAt: expireMinute ? expireAt : null,
-          status: EventStatus.PROCESSING,
+          status: EventStatus.CONTENT_READY,
         };
       } catch (error) {
         return {
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
-          status: EventStatus.FAIL,
+          status: EventStatus.FAILED,
           message: error.message,
         };
       }
@@ -213,7 +252,7 @@ export class EventService {
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
         message: '수신자 전화번호가 없습니다.',
-        status: EventStatus.FAIL,
+        status: EventStatus.FAILED,
       };
 
     try {
@@ -223,22 +262,23 @@ export class EventService {
       });
 
       return {
+        messageTemplate: { connect: { id: messageId } },
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
         credit: { connect: { id: usedCredit.id } },
-        status: EventStatus.PROCESSING,
+        status: EventStatus.CONTENT_READY,
       };
     } catch (error) {
       return {
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
-        status: EventStatus.FAIL,
+        status: EventStatus.FAILED,
         message: error.message,
       };
     }
   }
 
-  public async createOrderHistory(
+  private async createEventHistories(
     order: Prisma.OrderGetPayload<{
       include: {
         product: true;
@@ -263,6 +303,7 @@ export class EventService {
           const eventHistory = await transaction.eventHistory.create({
             data: {
               ...eventHistoryInput,
+              workspace: { connect: { id: workspaceId } },
               orderHistory: {
                 create: {
                   orderId,
@@ -274,17 +315,9 @@ export class EventService {
               },
             },
             include: {
-              event: {
+              messageTemplate: {
                 include: {
-                  message: {
-                    include: {
-                      kakaoTemplate: {
-                        include: {
-                          kakaoCredential: true,
-                        },
-                      },
-                    },
-                  },
+                  kakaoTemplate: true,
                 },
               },
             },
@@ -297,6 +330,65 @@ export class EventService {
         }),
       );
     });
+  }
+
+  private createMessageBody(
+    eventHistory: Prisma.EventHistoryGetPayload<{
+      include: {
+        messageTemplate: {
+          include: {
+            kakaoTemplate: true;
+          };
+        };
+      };
+    }>,
+    order: Prisma.OrderGetPayload<{
+      include: {
+        product: true;
+        productVariant: true;
+        store: true;
+      };
+    }>,
+    variables: Variables[],
+  ): Prisma.EventHistoryUpdateInput {
+    const { messageTemplate, id: eventHistoryId } = eventHistory;
+    const { kakaoTemplate } = messageTemplate;
+
+    const { product, productVariant, store, ...orderRest } = order;
+
+    const variableBody = {
+      storeName: store.name,
+      eventId: eventHistoryId,
+      productName: product?.name,
+      productVariantName: productVariant?.name,
+      ...orderRest,
+    };
+
+    const replaceTargetVariables = [
+      ...messageTemplate.variables,
+      { key: '#{이벤트_아이디}', value: '{이벤트아이디}' },
+    ];
+
+    const replacedVariables = replaceTargetVariables
+      .map((variable) => {
+        const { key, value } = variable;
+
+        return {
+          key,
+          value: this.messageService.replaceVariables(
+            variables,
+            variableBody,
+            value,
+          ),
+        };
+      })
+      .map(({ key, value }) => ({ [key]: value }))
+      .reduce((acc, cur) => ({ ...acc, ...cur }), {});
+
+    return {
+      messageContent: kakaoTemplate.content,
+      messageVariables: replacedVariables,
+    };
   }
 
   public async produceOrdersToSqs(
@@ -315,89 +407,58 @@ export class EventService {
   ) {
     if (!orders.length) return;
 
-    const availableEvents = (
-      await Promise.all(
-        orders.map(async (payload) => {
-          const orderHistory = await this.createOrderHistory(
-            payload.order,
-            payload.events,
-          );
-          return orderHistory;
-        }),
-      )
-    )
+    const eventHistories = await Promise.all(
+      orders.map(async (payload) =>
+        this.createEventHistories(payload.order, payload.events),
+      ),
+    );
+
+    const availableEvents = eventHistories
       .flat()
       .filter(
-        (event) =>
-          event !== undefined &&
-          event.eventHistory.status === EventStatus.PROCESSING,
+        (event) => event.eventHistory.status === EventStatus.CONTENT_READY,
       );
+    if (!availableEvents.length) return;
 
     const variables = await this.prismaService.variables.findMany();
-    const availableMessages = availableEvents.map((eventPayload) => {
-      const {
-        eventHistory: {
-          id: eventHistoryId,
-          event: { message },
-        },
-        order,
-      } = eventPayload;
+    const messageBodies = await Promise.allSettled(
+      availableEvents.map(async (eventPayload) => {
+        const updateInput = this.createMessageBody(
+          eventPayload.eventHistory,
+          eventPayload.order,
+          variables,
+        );
 
-      if (!message.variables) {
-        return {
-          eventId: eventPayload.eventHistory.id,
-          channelId: message.kakaoTemplate.kakaoCredential.channelId,
-          templateId: message.kakaoTemplate.templateId,
-          phoneNumber: order.receiverPhone,
-          variables: [],
-        };
-      }
+        return await this.prismaService.eventHistory.update({
+          where: { id: eventPayload.eventHistory.id },
+          data: {
+            ...updateInput,
+            status: EventStatus.READY,
+          },
+        });
+      }),
+    );
 
-      const { product, productVariant, store, ...orderRest } = order;
-      const variableBody = {
-        storeName: store.name,
-        eventId: eventHistoryId,
-        productName: product?.name,
-        productVariantName: productVariant?.name,
-        ...orderRest,
-      };
+    const successedMessage = messageBodies.filter(
+      (messageBody) => messageBody.status === 'fulfilled',
+    );
 
-      const replaceTargetVariables = [
-        ...message.variables,
-        { key: '#{이벤트_아이디}', value: '{이벤트아이디}' },
-      ];
+    this.logger.log(
+      `${successedMessage.length}개의 메세지 바디를 생성하였습니다.`,
+    );
 
-      const replacedVariables = replaceTargetVariables
-        .map((variable) => {
-          const { key, value } = variable;
+    const failedMessage = messageBodies.filter(
+      (messageBody) => messageBody.status === 'rejected',
+    );
 
-          return {
-            key,
-            value: this.messageService.replaceVariables(
-              variables,
-              variableBody,
-              value,
-            ),
-          };
-        })
-        .map(({ key, value }) => ({ [key]: value }))
-        .reduce((acc, cur) => ({ ...acc, ...cur }), {});
+    if (failedMessage.length) {
+      this.logger.error(
+        `${failedMessage.length}개의 메세지 바디를 생성하는데 실패하였습니다.`,
+      );
 
-      return {
-        eventId: eventHistoryId,
-        channelId: message.kakaoTemplate.kakaoCredential.channelId,
-        templateId: message.kakaoTemplate.templateId,
-        variables: replacedVariables,
-        phoneNumber: order.receiverPhone,
-      };
-    });
-
-    const sqsMessages = availableMessages.map((message) => ({
-      id: message.eventId + new Date().getTime().toString(),
-      body: JSON.stringify(message),
-    }));
-
-    if (!sqsMessages.length) return;
-    await this.sqsService.send('event', sqsMessages);
+      failedMessage.forEach(({ reason }) => {
+        this.logger.error(reason);
+      });
+    }
   }
 }

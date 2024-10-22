@@ -33,3 +33,4 @@ artifacts:
     - package.json
     - pnpm-lock.yaml
     - prisma/**/*
+    - node_modules/**/*

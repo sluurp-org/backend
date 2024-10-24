@@ -94,6 +94,45 @@ export class KakaoService {
     }
   }
 
+  private async templateGroupInvite(channelId: string) {
+    const SOLAPI_CHANNEL_GROUP_ID = this.configService.get<string>(
+      'SOLAPI_CHANNEL_GROUP_ID',
+    );
+
+    const createInviteResult = await firstValueFrom(this.httpService.post(
+      `/kakao/v2/channel-groups/invitations/${SOLAPI_CHANNEL_GROUP_ID}`,
+      {
+        channelId,
+      },
+      {
+        headers: {
+          Authorization: this.generateAccessToken(),
+        },
+      },
+    ));
+    if (!createInviteResult.data.invitationId)
+      throw new InternalServerErrorException(
+        '카카오 템플릿 그룹 초대에 실패했습니다.',
+      );
+
+
+    const acceptInviteResult = await firstValueFrom(this.httpService.post(
+      `/kakao/v2/channel-groups/invitations/${createInviteResult.data.invitationId}/accept`,
+      {},
+      {
+        headers: {
+          Authorization: this.generateAccessToken(),
+        },
+      },
+    ));
+    if (acceptInviteResult.data.status !== 'ACCEPTED')
+      throw new InternalServerErrorException(
+        '카카오 템플릿 그룹 초대 수락에 실패했습니다.',
+      );
+
+    return true;
+  }
+
   public async connectKakaoChannel(
     workspaceId: number,
     dto: ConnectChannelBodyDto,
@@ -117,6 +156,8 @@ export class KakaoService {
       const connectChannelResult =
         await this.solapiMessageService.createKakaoChannel(dto);
 
+      await this.templateGroupInvite(connectChannelResult.channelId);
+
       const { channelId, searchId } = connectChannelResult;
       return this.prismaService.kakaoCredential.create({
         data: {
@@ -132,11 +173,20 @@ export class KakaoService {
     }
   }
 
-  public async createKakaoTemplate(dto: CreateKakaoAlimtalkTemplateRequest) {
+  public async createKakaoTemplate(
+    dto: Pick<CreateKakaoAlimtalkTemplateRequest, 'name' | 'content' | 'categoryCode' | 'buttons' | 'quickReplies' | 'extra' | 'imageId'>,
+  ) {
+    const channelGroupId = this.configService.get<string>(
+      'SOLAPI_CHANNEL_GROUP_ID',
+    );
+    const { imageId } = dto;
+
     try {
       const createTemplateResult =
         await this.solapiMessageService.createKakaoAlimtalkTemplate({
           ...dto,
+          channelGroupId,
+          emphasizeType: imageId ? 'IMAGE' : 'NONE',
           messageType: this.getMessageType(dto),
         });
 
@@ -152,12 +202,14 @@ export class KakaoService {
     templateId: string,
     dto: UpdateKakaoAlimtalkTemplateRequest,
   ) {
+    const { imageId } = dto;
     try {
       const createTemplateResult =
         await this.solapiMessageService.updateKakaoAlimtalkTemplate(
           templateId,
           {
             ...dto,
+            emphasizeType: imageId ? 'IMAGE' : 'NONE',
             messageType: this.getMessageType(dto),
           },
         );

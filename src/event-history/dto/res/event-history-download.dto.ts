@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { ContentType } from '@prisma/client';
-import { Exclude, Expose } from 'class-transformer';
+import { Expose } from 'class-transformer';
 
 export class UserEventHistoryDownloadDto {
   @Expose()
@@ -11,7 +11,7 @@ export class UserEventHistoryDownloadDto {
   })
   url?: string;
 
-  @Exclude()
+  @Expose()
   @ApiProperty({
     description: '다운로드 텍스트',
     example: '다운로드 텍스트',

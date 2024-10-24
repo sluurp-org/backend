@@ -1,6 +1,65 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { EventStatus } from '@prisma/client';
-import { Exclude, Expose } from 'class-transformer';
+import { ContentType, EventStatus } from '@prisma/client';
+import { Exclude, Expose, Type } from 'class-transformer';
+
+class UserEventHistoryOrderDto {
+  @Expose()
+  @ApiProperty({
+    description: '주문 ID',
+    example: '2024019230123408',
+  })
+  productOrderId: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '주문 ID',
+    example: '2024019230123408',
+  })
+  orderId: string;
+  
+  @Expose()
+  @ApiProperty({
+    description: '주문자명',
+    example: '홍길동',
+  })
+  ordererName: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품 이름',
+    example: '상품 이름',
+  })
+  productName: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품 옵션 이름',
+    example: '상품 옵션 이름',
+    nullable: true,
+  })
+  productVariantName?: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품 가격',
+    example: 10000,
+  })
+  price: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '주문 수량',
+    example: 1,
+  })
+  quantity: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '주문 일시',
+    example: '2024-01-01',
+  })
+  orderAt: Date;
+}
 
 export class UserEventHistoryDto {
   @Expose()
@@ -39,6 +98,22 @@ export class UserEventHistoryDto {
     nullable: true,
   })
   downloadError?: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '주문',
+    type: UserEventHistoryOrderDto,
+  })
+  @Type(() => UserEventHistoryOrderDto)
+  order: UserEventHistoryOrderDto;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 타입',
+    example: ContentType.FILE,
+    enum: ContentType,
+  })
+  contentType: ContentType;
 
   @Exclude()
   disableDownload: boolean;

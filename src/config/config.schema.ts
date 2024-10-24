@@ -6,6 +6,7 @@ const validationSchema = Joi.object({
     .default('development'),
   SOLAPI_API_KEY: Joi.string().required(),
   SOLAPI_API_SECRET: Joi.string().required(),
+  SOLAPI_CHANNEL_GROUP_ID: Joi.string().required(),
   ACCESS_TOKEN_SECRET: Joi.string().required(),
   ACCESS_TOKEN_EXPIRES_IN: Joi.string().required(),
   REFRESH_TOKEN_SECRET: Joi.string().required(),

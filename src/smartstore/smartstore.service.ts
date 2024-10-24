@@ -22,6 +22,18 @@ export class SmartstoreService {
     private readonly prismaService: PrismaService,
   ) {}
 
+  private async handleCommerceError(error: unknown, applicationId: string) {
+    if (!isAxiosError(error)) return;
+    if (error.response.status !== 401) return;
+
+    await this.prismaService.store.updateMany({
+      where: { smartStoreCredentials: { applicationId } },
+      data: {
+        enabled: false,
+      },
+    });
+  }
+
   public async completeDelivery(
     applicationId: string,
     applicationSecret: string,
@@ -46,6 +58,7 @@ export class SmartstoreService {
         { headers: { Authorization: `Bearer ${accessToken}` } },
       );
     } catch (error) {
+      await this.handleCommerceError(error, applicationId);
       this.logger.error(error);
     }
   }
@@ -87,6 +100,8 @@ export class SmartstoreService {
 
       return options;
     } catch (error) {
+      await this.handleCommerceError(error, applicationId);
+      this.logger.error(error);
       if (isAxiosError(error)) {
         throw new InternalServerErrorException(
           '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
@@ -134,6 +149,7 @@ export class SmartstoreService {
 
       return allProducts;
     } catch (error) {
+      await this.handleCommerceError(error, applicationId);
       this.logger.error(error);
       throw new InternalServerErrorException(
         '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
@@ -166,6 +182,8 @@ export class SmartstoreService {
         url,
       };
     } catch (error) {
+      await this.handleCommerceError(error, applicationId);
+      this.logger.error(error);
       if (isAxiosError(error))
         throw new InternalServerErrorException(
           '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
@@ -242,6 +260,8 @@ export class SmartstoreService {
 
       return access_token;
     } catch (error) {
+      await this.handleCommerceError(error, applicationId);
+      this.logger.error(error);
       if (!isAxiosError(error)) {
         throw new InternalServerErrorException(
           '일시적인 문제가 발생하였습니다. 네이버 커머스 권한 정보를 확인하세요.',

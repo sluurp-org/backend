@@ -5,15 +5,17 @@ import { Workspace, WorkspaceRole } from '@prisma/client';
 import { ReqWorkspace } from 'src/common/decorators/req-workspace.decorator';
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
 import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
-import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { CreatePurchaseBodyDto } from './dto/req/create-purchase-body.dto';
 
 import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { BillingDto } from './dto/res/billing.dto';
 import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
-import { BillingQueryDto } from './dto/req/billing-query.dto';
 import { CreateCreditPurchaseOrderBodyDto } from './dto/req/create-credit-purchase-order-body.dto';
 import { CompletePurchaseBodyDto } from './dto/req/completed-purchase-body.dto';
+import { SubscriptionResponseDto, WorkspaceSubscriptionResponseDto } from './dto/res/subscription.dto';
+import { PurchaseHistoryDto } from './dto/res/purchase-history';
+import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
 
 @ApiTags('Purchase')
 @WorkspaceController('purchase')
@@ -22,20 +24,18 @@ export class PurchaseController {
 
   @Get('billing')
   @ApiOperation({
-    summary: '빌링키 목록 조회',
-    description: '워크스페이스의 빌링키 목록을 조회합니다.',
+    summary: '빌링키 조회',
+    description: '워크스페이스의 빌링키를 조회합니다.',
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
-  @Serialize(BillingDto, true)
-  @ApiOkResponsePaginated(BillingDto)
-  public async billingList(
+  @Serialize(BillingDto)
+  @ApiOkResponse({
+    type: BillingDto,
+  })
+  public async getBilling(
     @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Query() query: BillingQueryDto,
   ) {
-    const nodes = await this.purchaseService.findBilling(workspaceId, query);
-    const total = await this.purchaseService.countBilling(workspaceId);
-
-    return { nodes, total };
+    return this.purchaseService.findBilling(workspaceId);
   }
 
   @Post('billing')
@@ -53,39 +53,7 @@ export class PurchaseController {
     @ReqWorkspace() { id: workspaceId }: Workspace,
     @Body() dto: CreateBillingBodyDto,
   ) {
-    return this.purchaseService.createBilling(workspaceId, dto);
-  }
-
-  @Delete('billing/:billingId')
-  @ApiOperation({
-    summary: '빌링키 삭제',
-    description: '워크스페이스의 빌링키를 삭제합니다.',
-  })
-  @Serialize(BillingDto)
-  @ApiResponse({
-    status: 200,
-    type: BillingDto,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async deleteBilling(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Param('billingId') billingId: number,
-  ) {
-    return this.purchaseService.deleteBilling(workspaceId, billingId);
-  }
-
-  @Post('billing/:billingId/default')
-  @ApiOperation({
-    summary: '빌링키 기본 설정',
-    description: '워크스페이스의 빌링키를 기본으로 설정합니다.',
-  })
-  @Post('order')
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async order(
-    @Param('billingId') billingId: number,
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-  ) {
-    return this.purchaseService.updateDefaultBilling(workspaceId, billingId);
+    return this.purchaseService.upsertBilling(workspaceId, dto);
   }
 
   @Post('order/credit')
@@ -103,10 +71,32 @@ export class PurchaseController {
     return this.purchaseService.completeCreditPurchase(paymentId);
   }
 
+  @Get('history')
+  @ApiOperation({
+    summary: '결제 이력 조회',
+    description: '워크스페이스의 결제 이력을 조회합니다.',
+  })
+  @Serialize(PurchaseHistoryDto, true)
+  @ApiOkResponsePaginated(PurchaseHistoryDto)
+  @WorkspaceAuth([WorkspaceRole.OWNER])
+  public async history(
+    @ReqWorkspace() { id: workspaceId }: Workspace,
+    @Query() query: PurchaseHistoryQueryDto,
+  ) {
+    const total = await this.purchaseService.countPurchaseHistory(workspaceId, query);
+    const nodes = await this.purchaseService.getPurchaseHistory(workspaceId, query);
+
+    return { nodes, total };
+  }
+
   @Get()
   @ApiOperation({
     summary: '구독 정보 조회',
     description: '워크스페이스의 구독 정보를 조회합니다.',
+  })
+  @Serialize(WorkspaceSubscriptionResponseDto)
+  @ApiOkResponse({
+    type: WorkspaceSubscriptionResponseDto,
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
   public async subscription(@ReqWorkspace() { id: workspaceId }: Workspace) {
@@ -117,6 +107,11 @@ export class PurchaseController {
   @ApiOperation({
     summary: '구독 정보 생성',
     description: '워크스페이스의 구독 정보를 생성합니다.',
+  })
+  @Serialize(SubscriptionResponseDto)
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionResponseDto,
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
   public async createSubscription(
@@ -130,6 +125,11 @@ export class PurchaseController {
   @ApiOperation({
     summary: '구독 정보 수정',
     description: '워크스페이스의 구독 정보를 수정합니다.',
+  })
+  @Serialize(SubscriptionResponseDto)
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionResponseDto,
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
   public async updateSubscription(
@@ -145,6 +145,11 @@ export class PurchaseController {
     description: '워크스페이스의 구독 정보를 삭제합니다.',
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
+  @Serialize(SubscriptionResponseDto)
+  @ApiResponse({
+    status: 200,
+    type: SubscriptionResponseDto,
+  })
   public async deleteSubscription(
     @ReqWorkspace() { id: workspaceId }: Workspace,
   ) {

@@ -192,6 +192,13 @@ export class MessageDto {
   })
   contentGroupId?: number;
 
+  @ApiProperty({
+    description: '메세지 배송 완료 여부',
+    example: true,
+  })
+  @Expose()
+  completeDelivery: boolean;
+
   @Expose()
   @ApiProperty({
     description: '컨텐츠 그룹',

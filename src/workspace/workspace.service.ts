@@ -33,14 +33,14 @@ export class WorkspaceService {
     }
   }
 
-  public async findWorkspaceById(userId: number, id: number) {
-    const workspaceUser = await this.validateWorkspaceUser(id, userId);
+  public async findWorkspaceById(userId: number, workspaceId: number) {
+    const workspaceUser = await this.validateWorkspaceUser(userId, workspaceId);
     if (!workspaceUser)
-      throw new ForbiddenException('워크스페이스 멤버가 아닙니다.');
+      throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
     try {
       const workspace = await this.prismaService.workspace.findUnique({
-        where: { id, deletedAt: null },
+        where: { id: workspaceId, deletedAt: null },
       });
       return workspace;
     } catch (error) {
@@ -111,7 +111,7 @@ export class WorkspaceService {
 
     const workspaceUser = await this.validateWorkspaceUser(id, userId);
     if (!workspaceUser)
-      throw new ForbiddenException('워크스페이스 멤버가 아닙니다.');
+      throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
     try {
       const workspace = await this.prismaService.workspace.update({
@@ -153,7 +153,7 @@ export class WorkspaceService {
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(
-        '워크스페이스 멤버 조회에 실패했습니다.',
+        '워크스페이스 사용자 조회에 실패했습니다.',
       );
     }
   }
@@ -169,7 +169,7 @@ export class WorkspaceService {
         userId,
       );
       if (!workspaceUser)
-        throw new ForbiddenException('워크스페이스 멤버가 아닙니다.');
+        throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
       if (workspaceUser.role === WorkspaceRole.OWNER) {
         const workspaceUsers = await this.prismaService.workspaceUser.count({
@@ -188,7 +188,7 @@ export class WorkspaceService {
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(
-        '워크스페이스 멤버 역할 수정에 실패했습니다.',
+        '워크스페이스 사용자 역할 수정에 실패했습니다.',
       );
     }
   }
@@ -199,7 +199,7 @@ export class WorkspaceService {
         where: { userId_workspaceId: { workspaceId, userId } },
       });
       if (!workspaceUser)
-        throw new ForbiddenException('워크스페이스 멤버가 아닙니다.');
+        throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
       if (workspaceUser.role === WorkspaceRole.OWNER) {
         const workspaceUsers = await this.prismaService.workspaceUser.count({
@@ -222,20 +222,18 @@ export class WorkspaceService {
     }
   }
 
-  public validateWorkspaceUser(
+  public async validateWorkspaceUser(
     userId: number,
     workspaceId: number,
   ): Promise<WorkspaceUser> {
     try {
-      const workspaceUser = this.prismaService.workspaceUser.findUnique({
+      return this.prismaService.workspaceUser.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } },
       });
-
-      return workspaceUser;
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(
-        '워크스페이스 멤버 조회에 실패했습니다.',
+        '워크스페이스 사용자 조회에 실패했습니다.',
       );
     }
   }

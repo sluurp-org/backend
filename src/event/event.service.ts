@@ -146,27 +146,6 @@ export class EventService {
     });
   }
 
-  // private async createMessageBody(
-  //   order: Prisma.OrderGetPayload<{
-  //     include: {
-  //       product: true;
-  //       productVariant: true;
-  //       store: true;
-  //     };
-  //   }>,
-  //   variables: Variables[],
-  //   // messageVariables: MessageVariab[],
-  // ) {
-  //   const { product, productVariant, store, ...orderRest } = order;
-  //   const variableBody = {
-  //     storeName: store.name,
-  //     eventId: order.eventHistory,
-  //     productName: product?.name,
-  //     productVariantName: productVariant?.name,
-  //     ...orderRest,
-  //   };
-  // }
-
   private async createEventHistoryInput(
     order: Order,
     event: Prisma.EventGetPayload<{
@@ -251,7 +230,7 @@ export class EventService {
       return {
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
-        message: '수신자 전화번호가 없습니다.',
+        message: '수신자 전화번호가 유효하지 않습니다.',
         status: EventStatus.FAILED,
       };
 
@@ -391,7 +370,7 @@ export class EventService {
     };
   }
 
-  public async produceOrdersToSqs(
+  public async createEventHistoryBody(
     orders: {
       events: Prisma.EventGetPayload<{
         include: { message: { include: { contentGroup: true } } };

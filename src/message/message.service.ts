@@ -139,7 +139,6 @@ export class MessageService {
 
     const { templateId } = await this.kakaoService.createKakaoTemplate({
       name: kakaoTemplateName,
-      channelId: kakaoCredential.channelId,
       buttons: kakaoTemplateButtons,
       content,
       categoryCode,
@@ -234,14 +233,15 @@ export class MessageService {
       throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
     }
 
-    const { name, variables, contentGroupId, kakaoTemplate } = dto;
+    const { name, variables, contentGroupId, kakaoTemplate, completeDelivery } =
+      dto;
     return this.prismaService.$transaction(async (tx) => {
       if (kakaoTemplate)
         await this.updateKakaoTemplate(tx, message, kakaoTemplate);
 
       return tx.messageTemplate.update({
         where: { id: messageId },
-        data: { name, variables: variables || [], contentGroupId },
+        data: { name, variables: variables || [], contentGroupId, completeDelivery },
       });
     });
   }
@@ -320,13 +320,13 @@ export class MessageService {
         targetUrl = url;
       }
       if (button.type === KakaoTemplateButtonType.PR) {
-        targetUrl = `https://sluurp.io/order/download/#{이벤트_아이디}`;
+        targetUrl = `https://sluurp.io/order/#{이벤트_아이디}/download`;
       }
       if (button.type === KakaoTemplateButtonType.RW) {
-        targetUrl = `https://sluurp.io/order/review/#{이벤트_아이디}`;
+        targetUrl = `https://sluurp.io/order/#{이벤트_아이디}/review`;
       }
       if (button.type === KakaoTemplateButtonType.PC) {
-        targetUrl = `https://sluurp.io/order/confirm/#{이벤트_아이디}`;
+        targetUrl = `https://sluurp.io/order/#{이벤트_아이디}/confirm`;
       }
 
       return {

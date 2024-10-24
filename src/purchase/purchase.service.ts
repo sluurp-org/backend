@@ -17,12 +17,12 @@ import {
   Workspace,
   WorkspaceBilling,
 } from '@prisma/client';
-import { BillingQueryDto } from './dto/req/billing-query.dto';
 import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
 import * as crypto from 'crypto';
 import { CreateCreditPurchaseOrderBodyDto } from './dto/req/create-credit-purchase-order-body.dto';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
 import { WebhookTypeEnum } from 'src/portone/enum/webhook.enum';
+import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
 
 @Injectable()
 export class PurchaseService {
@@ -389,16 +389,15 @@ export class PurchaseService {
     workspaceId: number,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
-    return transaction.workspaceBilling.findFirst({
-      where: { workspaceId, default: true },
+    return transaction.workspaceBilling.findUnique({
+      where: { workspaceId },
     });
   }
 
   // 현재 결제 목록 빌링 변경
   private async changeBilling(
     workspaceId: number,
-    oldBillingId: number,
-    updateBillingId: number,
+    billingId: number,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
     const currentSchedules = await transaction.purchaseHistory.findMany({
@@ -406,7 +405,6 @@ export class PurchaseService {
         workspaceId,
         type: PurchaseType.SUBSCRIPTION,
         status: PurchaseStatus.READY,
-        billingId: oldBillingId,
         scheduledId: { not: null },
         endedAt: { gte: new Date() },
         startedAt: { gte: new Date() },
@@ -426,13 +424,12 @@ export class PurchaseService {
         workspaceId,
         type: PurchaseType.SUBSCRIPTION,
         status: PurchaseStatus.READY,
-        billingId: oldBillingId,
         scheduledId: { not: null },
         endedAt: { gte: new Date() },
         startedAt: { gte: new Date() },
       },
       data: {
-        billingId: updateBillingId,
+        billingId,
       },
     });
 
@@ -441,7 +438,6 @@ export class PurchaseService {
         workspaceId,
         type: PurchaseType.SUBSCRIPTION,
         status: PurchaseStatus.READY,
-        billingId: updateBillingId,
         scheduledId: { not: null },
         endedAt: { gte: new Date() },
         startedAt: { gte: new Date() },
@@ -703,7 +699,7 @@ export class PurchaseService {
         throw new NotFoundException('구독을 찾을 수 없습니다.');
 
       const billing = await transaction.workspaceBilling.findFirst({
-        where: { workspaceId, default: true },
+        where: { workspaceId },
       });
       if (!billing)
         throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
@@ -752,7 +748,7 @@ export class PurchaseService {
         throw new NotFoundException('구독을 찾을 수 없습니다.');
 
       const billing = await transaction.workspaceBilling.findFirst({
-        where: { workspaceId, default: true },
+        where: { workspaceId },
       });
       if (!billing)
         throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
@@ -927,12 +923,9 @@ export class PurchaseService {
   }
 
   // 결제 정보 조회
-  public findBilling(workspaceId: number, dto: BillingQueryDto) {
-    const { skip, take } = dto;
-    return this.prismaService.workspaceBilling.findMany({
+  public findBilling(workspaceId: number) {
+    return this.prismaService.workspaceBilling.findUnique({
       where: { workspaceId },
-      skip,
-      take,
     });
   }
 
@@ -944,7 +937,7 @@ export class PurchaseService {
   }
 
   // 결제 정보 생성
-  public async createBilling(workspaceId: number, dto: CreateBillingBodyDto) {
+  public async upsertBilling(workspaceId: number, dto: CreateBillingBodyDto) {
     const workspace = await this.prismaService.workspace.findUnique({
       where: { id: workspaceId, deletedAt: null },
     });
@@ -985,18 +978,29 @@ export class PurchaseService {
       }),
     );
 
-    const maskedCardNumber = dto.number.replace(/\d{4}(?=\d{4})/g, '**** ');
-    const defaultBilling = await this.findDefaultBilling(workspaceId);
 
-    return await this.prismaService.workspaceBilling.create({
-      data: {
+    const maskedCardNumber = dto.number.replace(/\d{4}(?=\d{4})/g, '**** ');
+
+    return await this.prismaService.$transaction(async (transaction) => {
+      const billing = await transaction.workspaceBilling.upsert({
+        where: { workspaceId },
+      update: {
         workspaceId,
         billingKey: billingKeyResponse,
         cardNumber: maskedCardNumber,
         hashedCardNumber,
-        default: defaultBilling === null,
       },
-    });
+      create: {
+        workspaceId,
+        billingKey: billingKeyResponse,
+        cardNumber: maskedCardNumber,
+        hashedCardNumber,
+        },
+      });
+      await this.changeBilling(workspaceId, billing.id, transaction);
+
+      return billing;
+    })
   }
 
   // 결제 정보 삭제
@@ -1008,7 +1012,7 @@ export class PurchaseService {
       if (!billing)
         throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
 
-      if (billing.default)
+      if (billing)
         throw new NotAcceptableException(
           '기본 결제 정보는 삭제할 수 없습니다.',
         );
@@ -1031,7 +1035,6 @@ export class PurchaseService {
 
       const updatedSchedules = await this.changeBilling(
         workspaceId,
-        deletedBilling.id,
         defaultBilling.id,
         transaction,
       );
@@ -1060,18 +1063,17 @@ export class PurchaseService {
         throw new NotAcceptableException('이미 기본 결제 정보입니다.');
 
       await transaction.workspaceBilling.updateMany({
-        where: { workspaceId, default: true },
-        data: { default: false },
+        where: { workspaceId, },
+        data: { },
       });
 
       const updatedBilling = await transaction.workspaceBilling.update({
         where: { id: billingId, workspaceId },
-        data: { default: true },
+        data: { },
       });
 
       const updatedSchedules = await this.changeBilling(
         workspaceId,
-        currentDefaultBilling.id,
         updatedBilling.id,
         transaction,
       );
@@ -1107,61 +1109,56 @@ export class PurchaseService {
 
   // 크레딧 결제 완료
   public async completeCreditPurchase(paymentId: string) {
-    try {
-      const paymentResult = await this.portoneService.getPayment(paymentId);
-      if (!paymentResult)
+    const paymentResult = await this.portoneService.getPayment(paymentId);
+    if (!paymentResult)
+      throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
+
+    await this.prismaService.$transaction(async (transaction) => {
+      const purchase = await transaction.purchaseHistory.findUnique({
+        where: { id: paymentId },
+      });
+      if (!purchase)
         throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
 
-      await this.prismaService.$transaction(async (transaction) => {
-        const purchase = await transaction.purchaseHistory.findUnique({
-          where: { id: paymentId },
-        });
-        if (!purchase)
-          throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
+      if (purchase.amount !== paymentResult.amount.total)
+        throw new NotAcceptableException('결제 금액이 일치하지 않습니다.');
 
-        if (purchase.amount !== paymentResult.amount.total)
-          throw new NotAcceptableException('결제 금액이 일치하지 않습니다.');
+      if (purchase.type !== PurchaseType.CREDIT)
+        throw new NotAcceptableException('크레딧 결제가 아닙니다.');
 
-        if (purchase.type !== PurchaseType.CREDIT)
-          throw new NotAcceptableException('크레딧 결제가 아닙니다.');
+      if (
+        (purchase.status === PurchaseStatus.PAID &&
+          paymentResult.status === PurchaseStatus.PAID) ||
+        purchase.creditId
+      )
+        throw new NotAcceptableException('이미 결제 완료된 주문입니다.');
 
-        if (
-          (purchase.status === PurchaseStatus.PAID &&
-            paymentResult.status === PurchaseStatus.PAID) ||
-          purchase.creditId
-        )
-          throw new NotAcceptableException('이미 결제 완료된 주문입니다.');
-
-        if (paymentResult.status === PurchaseStatus.PAID) {
-          const credit = await this.creditService.create(
-            purchase.workspaceId,
-            {
-              amount: purchase.amount,
-              reason: purchase.reason,
-            },
-            transaction,
-          );
-
-          return await transaction.purchaseHistory.update({
-            where: { id: paymentId },
-            data: {
-              status: PurchaseStatus.PAID,
-              purchasedAt: new Date(),
-              creditId: credit.id,
-            },
-          });
-        }
+      if (paymentResult.status === PurchaseStatus.PAID) {
+        const credit = await this.creditService.create(
+          purchase.workspaceId,
+          {
+            amount: purchase.amount,
+            reason: purchase.reason,
+          },
+          transaction,
+        );
 
         return await transaction.purchaseHistory.update({
           where: { id: paymentId },
-          data: { status: paymentResult.status },
+          data: {
+            status: PurchaseStatus.PAID,
+            purchasedAt: new Date(),
+            creditId: credit.id,
+          },
         });
+      }
+
+      return await transaction.purchaseHistory.update({
+        where: { id: paymentId },
+        data: { status: paymentResult.status },
+        include: {subscription: true}
       });
-    } catch (error) {
-      throw new InternalServerErrorException(
-        '결제 정보를 가져오는 중 오류가 발생했습니다.',
-      );
-    }
+    });
   }
 
   // 결제 정보 삭제
@@ -1195,10 +1192,6 @@ export class PurchaseService {
     if (purchase.type === PurchaseType.CREDIT)
       return this.completeCreditPurchase(paymentId);
 
-    if (purchase.type === PurchaseType.SUBSCRIPTION)
-      return this.renewSubscription(paymentId);
-
-    return true;
   }
 
   // 결제 실패
@@ -1218,6 +1211,33 @@ export class PurchaseService {
     return await this.prismaService.purchaseHistory.update({
       where: { id: paymentId },
       data: { status: paymentResult.status },
+    });
+  }
+
+  public countPurchaseHistory(workspaceId: number, query: PurchaseHistoryQueryDto) {
+    const { type } = query;
+
+    return this.prismaService.purchaseHistory.count({
+      where: {
+        workspaceId,
+        type,
+        status: { notIn: [PurchaseStatus.READY, PurchaseStatus.PAY_PENDING] },
+      },
+    });
+  }
+
+  public getPurchaseHistory(workspaceId: number, query: PurchaseHistoryQueryDto) {
+    const { type, skip, take } = query;
+
+    return this.prismaService.purchaseHistory.findMany({
+      where: {
+        workspaceId,
+        type,
+        status: { notIn: [PurchaseStatus.READY, PurchaseStatus.PAY_PENDING] },
+      },
+      skip,
+      take,
+      orderBy: { createdAt: 'desc' },
     });
   }
 

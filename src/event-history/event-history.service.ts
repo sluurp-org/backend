@@ -83,6 +83,19 @@ export class EventHistoryService {
   public async findOne(eventHistoryId: string) {
     const eventHistory = await this.prisma.eventHistory.findUnique({
       where: { id: eventHistoryId },
+      include: {
+        order: {
+          include: {
+            product: true,
+            productVariant: true,
+          },
+        },
+        content: {
+          include: {
+            contentGroup: true,
+          },
+        },
+      },
     });
     if (!eventHistory)
       throw new NotFoundException('존재하지 않는 주문 입니다.');
@@ -99,6 +112,12 @@ export class EventHistoryService {
 
     return {
       ...eventHistory,
+      order: {
+        productName: eventHistory.order.product.name,
+        productVariantName: eventHistory.order.productVariant?.name,
+        ...eventHistory.order,
+      },
+      contentType: eventHistory.content?.contentGroup?.type,
       downloadAvailable: true,
       downloadError: null,
     };

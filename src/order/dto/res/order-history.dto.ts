@@ -8,7 +8,11 @@ import {
 import { Exclude, Expose, Type } from 'class-transformer';
 
 export class EventHistoryDto {
-  @Exclude()
+  @Expose()
+  @ApiProperty({
+    description: '이벤트 기록 고유 ID',
+    example: '1',
+  })
   id: string;
 
   @Exclude()

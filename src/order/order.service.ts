@@ -22,7 +22,6 @@ export class OrderService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly eventService: EventService,
-    private readonly workspaceService: WorkspaceService,
   ) {}
 
   public async findOne(
@@ -127,7 +126,9 @@ export class OrderService {
     const { orderAt, ordererName, ordererPhone, receiverName, receiverPhone } =
       dto;
 
-    return this.prismaService.order.create({
+    console.log('order create')
+
+    const order = await this.prismaService.order.create({
       data: {
         orderId: randomUUID(),
         productOrderId: randomUUID(),
@@ -137,7 +138,30 @@ export class OrderService {
         receiverPhone: receiverPhone || ordererPhone,
         ...dto,
       },
+      include: {
+        product: true,
+        productVariant: true,
+        store: true,
+      },
     });
+
+    try {
+      const events = await this.findEvents(
+        workspaceId,
+        order.productId,
+        order.productVariantId,
+        order.status,
+      );
+  
+     await this.eventService.createEventHistoryBody([{
+        order,
+        events,
+      }]);
+    } catch (error) {
+      this.logger.error(error, error.stack, OrderService.name);
+    }
+
+    return order;
   }
 
   public async update(
@@ -492,7 +516,7 @@ export class OrderService {
       },
     );
 
-    await this.eventService.produceOrdersToSqs(orderEvents);
+    await this.eventService.createEventHistoryBody(orderEvents);
     return orderEvents;
   }
 }

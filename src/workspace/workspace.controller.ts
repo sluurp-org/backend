@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Patch, Post } from '@nestjs/common';
 import { ApiOperation, ApiTags } from '@nestjs/swagger';
 import { User } from '@prisma/client';
 
@@ -6,6 +6,7 @@ import { ReqUser } from 'src/common/decorators/req-user.decorator';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { Auth } from 'src/auth/decorators/auth.decorator';
 import { WorkspaceService } from './workspace.service';
+import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 
 @ApiTags('workspace')
 @Controller('workspace')
@@ -43,6 +44,19 @@ export class WorkspaceController {
     @Body() createWorkspaceDto: CreateWorkspaceDto,
   ) {
     return this.workspaceService.createWorkspace(user.id, createWorkspaceDto);
+  }
+
+  @Patch(':workspaceId')
+  @Auth()
+  @ApiOperation({
+    summary: '워크스페이스 수정',
+    description: '워크스페이스를 수정합니다.',
+  })
+  async updateWorkspace(
+    @Param('workspaceId') id: number,
+    @Body() updateWorkspaceDto: UpdateWorkspaceDto,
+  ) {
+    return this.workspaceService.updateWorkspace(id, updateWorkspaceDto);
   }
 
   @Auth()

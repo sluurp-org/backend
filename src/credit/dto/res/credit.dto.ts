@@ -48,11 +48,15 @@ export class CreditDto {
   @Expose()
   reason?: string;
 
-  @Exclude()
-  workspaceId: number;
+  @ApiProperty({
+    example: new Date(),
+    description: '크레딧 생성일',
+  })
+  @Expose()
+  createdAt: Date;
 
   @Exclude()
-  createdAt: Date;
+  workspaceId: number;
 
   @Exclude()
   updatedAt: Date;

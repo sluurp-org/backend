@@ -93,17 +93,16 @@ model Workspace {
   contentGroup     ContentGroup[]
   workspaceCredit  WorkspaceCredit[]
   purchaseHistory  PurchaseHistory[]
-  workspaceBilling WorkspaceBilling[]
+  workspaceBilling WorkspaceBilling?
   EventHistory     EventHistory[]
 }
 
 model WorkspaceBilling {
-  id               Int     @id @default(autoincrement())
-  workspaceId      Int
+  id               Int    @id @default(autoincrement())
+  workspaceId      Int    @unique
   cardNumber       String
   hashedCardNumber String
-  billingKey       String  @unique
-  default          Boolean @default(false)
+  billingKey       String @unique
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
@@ -251,8 +250,8 @@ model Order {
   receiverEmail String?
   receiverPhone String?
 
-  price    Int?
-  quantity Int?
+  price    Int?      @db.UnsignedMediumInt
+  quantity Int?      @db.UnsignedMediumInt
   orderAt  DateTime?
 
   deliveryAddress        String?
@@ -460,16 +459,17 @@ model MessageTemplate {
   name             String
   completeDelivery Boolean @default(false)
   readonly         Boolean @default(false)
+  isGlobal         Boolean @default(false)
 
   /// [TemplateVariables]
   variables Json?
 
-  workspaceId     Int
+  workspaceId     Int?
   kakaoTemplateId Int?
   contentGroupId  Int?
 
   kakaoTemplate KakaoTemplate? @relation(fields: [kakaoTemplateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
-  workspace     Workspace      @relation(fields: [workspaceId], references: [id])
+  workspace     Workspace?     @relation(fields: [workspaceId], references: [id])
   contentGroup  ContentGroup?  @relation(fields: [contentGroupId], references: [id])
 
   createdAt    DateTime       @default(now())

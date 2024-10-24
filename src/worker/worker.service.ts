@@ -56,6 +56,15 @@ export class WorkerService {
     );
   }
 
+  public async expiredSmartstoreToken(applicationId: string) {
+    await this.prismaService.store.updateMany({
+      where: { smartStoreCredentials: { applicationId } },
+      data: {
+        enabled: false,
+      },
+    });
+  }
+
   public async updateStoreLastSyncedAt(
     storeId: number,
     lastSyncedAt: Date,

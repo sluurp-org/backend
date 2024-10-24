@@ -94,6 +94,22 @@ export class WorkerController {
   }
 
   @ApiOperation({
+    summary: '네이버 커머스 토큰 만료',
+    description: '네이버 커머스 토큰을 만료합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '네이버 커머스 토큰 만료 성공',
+    type: String,
+  })
+  @Get('smartstore/token-expired')
+  @WorkerAuth()
+  public async expiredSmartstoreToken(@Body('applicationId') applicationId: string) {
+    return await this.workerService.expiredSmartstoreToken(applicationId);
+  }
+  
+
+  @ApiOperation({
     summary: '스토어 마지막 조회 시간 업데이트',
     description: '스토어의 마지막 조회 시간을 업데이트합니다.',
   })

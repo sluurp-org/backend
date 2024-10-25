@@ -17,6 +17,13 @@ export class MessagesDto {
   })
   name: string;
 
+  @Expose()
+  @ApiProperty({
+    description: '전역 여부',
+    example: false,
+  })
+  isGlobal: boolean;
+
   @Exclude()
   variables: Prisma.JsonValue;
 

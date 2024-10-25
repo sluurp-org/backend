@@ -218,6 +218,13 @@ export class MessageDto {
 
   @Expose()
   @ApiProperty({
+    description: '전역 여부',
+    example: false,
+  })
+  isGlobal: boolean;
+
+  @Expose()
+  @ApiProperty({
     description: '생성일',
     example: '2021-08-31T07:00:00.000Z',
   })

@@ -40,7 +40,9 @@ export class MessageService {
   public async findAll(id: number, dto: FindMessageQueryDto) {
     const { name, take, skip } = dto;
     return this.prismaService.messageTemplate.findMany({
-      where: { workspaceId: id, name: { contains: name } },
+      where: {
+        OR: [{ workspaceId: id, name: { contains: name } }, { isGlobal: true }],
+      },
       orderBy: { id: 'desc' },
       take,
       skip,
@@ -55,15 +57,23 @@ export class MessageService {
   }
 
   public async findOne(id: number, messageId: number) {
-    const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId: id },
+    const message = await this.prismaService.messageTemplate.findFirst({
+      where: {
+        OR: [
+          { id: messageId, workspaceId: id },
+          { id: messageId, isGlobal: true },
+        ],
+      },
       include: {
         kakaoTemplate: true,
         contentGroup: true,
       },
     });
     const comments = [];
-    if (message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED) {
+    if (
+      !message.isGlobal &&
+      message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED
+    ) {
       const kakaoTemplate = await this.kakaoService.getKakaoTemplate(
         message.kakaoTemplate.templateId,
       );
@@ -95,12 +105,7 @@ export class MessageService {
         data: { name, workspaceId, ...rest },
       });
 
-      await this.handleKakaoTemplateCreation(
-        tx,
-        message.id,
-        workspaceId,
-        kakaoTemplate,
-      );
+      await this.handleKakaoTemplateCreation(tx, message.id, kakaoTemplate);
       return message;
     });
   }
@@ -108,7 +113,6 @@ export class MessageService {
   private async handleKakaoTemplateCreation(
     tx: Prisma.TransactionClient,
     messageId: number,
-    workspaceId: number,
     kakaoTemplate: CreateKakaoTemplateBodyDto,
   ) {
     const { content, buttons, categoryCode, extra, imageId, imageUrl } =
@@ -168,7 +172,7 @@ export class MessageService {
     messageId: number,
   ) {
     const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId },
+      where: { id: messageId, workspaceId, isGlobal: false },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -190,7 +194,7 @@ export class MessageService {
 
   public async cancelMessageInspection(workspaceId: number, messageId: number) {
     const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId },
+      where: { id: messageId, workspaceId, isGlobal: false },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -220,7 +224,7 @@ export class MessageService {
     dto: UpdateMessageBodyDto,
   ) {
     const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId },
+      where: { id: messageId, workspaceId, isGlobal: false },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -285,7 +289,7 @@ export class MessageService {
 
   public async deleteMessage(workspaceId: number, messageId: number) {
     const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId },
+      where: { id: messageId, workspaceId, isGlobal: false },
       include: { kakaoTemplate: true },
     });
     if (!message) {

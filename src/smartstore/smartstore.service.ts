@@ -38,7 +38,6 @@ export class SmartstoreService {
     applicationId: string,
     applicationSecret: string,
     productOrderIds: string[],
-    dateProcessed: Date,
   ) {
     const accessToken = await this.findAccessToken(
       applicationId,
@@ -52,7 +51,7 @@ export class SmartstoreService {
           dispatchProductOrders: productOrderIds.map((productOrderId) => ({
             productOrderId,
             deliveryMethod: 'DIRECT_DELIVERY',
-            dispatchDate: dateProcessed.toISOString(),
+            dispatchDate: new Date().toISOString(),
           })),
         },
         { headers: { Authorization: `Bearer ${accessToken}` } },

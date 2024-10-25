@@ -15,6 +15,8 @@ import { MessageService } from 'src/message/message.service';
 import { CreditService } from 'src/credit/credit.service';
 import { ContentService } from 'src/content/content.service';
 import { WorkspaceService } from 'src/workspace/workspace.service';
+import { format } from 'date-fns';
+import { ko } from 'date-fns/locale';
 
 @Injectable()
 export class EventService {
@@ -333,13 +335,18 @@ export class EventService {
     const { messageTemplate, id: eventHistoryId } = eventHistory;
     const { kakaoTemplate } = messageTemplate;
 
-    const { product, productVariant, store, ...orderRest } = order;
+    const { product, productVariant, store, orderAt, ...orderRest } = order;
 
     const variableBody = {
       storeName: store.name,
       eventId: eventHistoryId,
-      productName: product?.name,
-      productVariantName: productVariant?.name,
+      productName: product?.name || '-',
+      productVariantName: productVariant?.name || '-',
+      orderAt: orderAt
+        ? format(orderAt, 'YYYY-MM-DD HH:mm', {
+            locale: ko,
+          })
+        : '-',
       ...orderRest,
     };
 

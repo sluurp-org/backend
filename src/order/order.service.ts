@@ -126,7 +126,7 @@ export class OrderService {
     const { orderAt, ordererName, ordererPhone, receiverName, receiverPhone } =
       dto;
 
-    console.log('order create')
+    console.log('order create');
 
     const order = await this.prismaService.order.create({
       data: {
@@ -152,11 +152,13 @@ export class OrderService {
         order.productVariantId,
         order.status,
       );
-  
-     await this.eventService.createEventHistoryBody([{
-        order,
-        events,
-      }]);
+
+      await this.eventService.createEventHistoryBody([
+        {
+          order,
+          events,
+        },
+      ]);
     } catch (error) {
       this.logger.error(error, error.stack, OrderService.name);
     }

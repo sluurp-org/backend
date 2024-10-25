@@ -154,6 +154,7 @@ export class WorkerService {
                 processedAt: dateProcessed,
                 solapiMessageId: messageId,
                 solapiStatusCode: statusCode,
+                message: '메세지 발송 성공',
               },
             });
 
@@ -190,6 +191,7 @@ export class WorkerService {
               processedAt: dateProcessed,
               solapiMessageId: messageId,
               solapiStatusCode: statusCode,
+              message: '메세지 발송 실패',
             },
           });
 
@@ -262,7 +264,6 @@ export class WorkerService {
             applicationId,
             applicationSecret,
             events.map((event) => event.order.productOrderId),
-            events[0].processedAt,
           );
         },
       ),

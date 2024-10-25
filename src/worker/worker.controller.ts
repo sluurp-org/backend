@@ -104,10 +104,11 @@ export class WorkerController {
   })
   @Get('smartstore/token-expired')
   @WorkerAuth()
-  public async expiredSmartstoreToken(@Body('applicationId') applicationId: string) {
+  public async expiredSmartstoreToken(
+    @Body('applicationId') applicationId: string,
+  ) {
     return await this.workerService.expiredSmartstoreToken(applicationId);
   }
-  
 
   @ApiOperation({
     summary: '스토어 마지막 조회 시간 업데이트',

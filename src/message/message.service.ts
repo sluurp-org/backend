@@ -111,9 +111,6 @@ export class MessageService {
     workspaceId: number,
     kakaoTemplate: CreateKakaoTemplateBodyDto,
   ) {
-    const kakaoCredential =
-      await this.kakaoService.findWorkspaceKakao(workspaceId);
-
     const { content, buttons, categoryCode, extra, imageId, imageUrl } =
       kakaoTemplate;
     const createdKakaoTemplate = await tx.kakaoTemplate.create({
@@ -121,9 +118,6 @@ export class MessageService {
         content,
         buttons,
         templateId: messageId + randomUUID(),
-        kakaoCredential: {
-          connect: kakaoCredential,
-        },
         status: KakaoTemplateStatus.UPLOADED,
         categoryCode,
         extra,
@@ -241,7 +235,12 @@ export class MessageService {
 
       return tx.messageTemplate.update({
         where: { id: messageId },
-        data: { name, variables: variables || [], contentGroupId, completeDelivery },
+        data: {
+          name,
+          variables: variables || [],
+          contentGroupId,
+          completeDelivery,
+        },
       });
     });
   }

@@ -13,6 +13,7 @@ import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
 import { SmartstoreService } from 'src/smartstore/smartstore.service';
 import { StoreDto } from './dto/res/store.dto';
 import { SqsService } from '@ssut/nestjs-sqs';
+import { differenceInMinutes, isSameHour } from 'date-fns';
 
 @Injectable()
 export class StoreService {
@@ -206,6 +207,19 @@ export class StoreService {
       include: { smartStoreCredentials: true },
     });
     if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
+
+    if (
+      store.lastProductSyncAt &&
+      isSameHour(store.lastProductSyncAt, new Date())
+    ) {
+      const leftMinutes = differenceInMinutes(
+        new Date(),
+        store.lastProductSyncAt,
+      );
+      throw new BadRequestException(
+        `최근 동기화 시간이 ${leftMinutes}분 이내입니다. ${leftMinutes}분 뒤에 다시 시도해주세요.`,
+      );
+    }
 
     if (store.type === StoreType.SMARTSTORE && store.smartStoreCredentials) {
       const { applicationId, applicationSecret } = store.smartStoreCredentials;

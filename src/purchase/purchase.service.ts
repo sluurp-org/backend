@@ -39,17 +39,19 @@ export class PurchaseService {
   ) {}
 
   // 무료 평가판 불가능한지 확인
-  private async isNotAvailableFreeTrial(
+  public async isNotAvailableFreeTrial(
     workspaceId: number,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
-    return transaction.purchaseHistory.findFirst({
+    const subscription = await transaction.purchaseHistory.findFirst({
       where: {
         workspaceId,
         type: PurchaseType.SUBSCRIPTION,
         status: PurchaseStatus.PAID,
       },
     });
+
+    return !!subscription;
   }
 
   // 현재 구독 조회
@@ -314,6 +316,38 @@ export class PurchaseService {
     );
 
     return currentSubscription;
+  }
+
+  public async calculateWorkspaceAdditionalPayment(
+    workspaceId: number,
+    subscriptionId: number,
+  ) {
+    const currentSubscription = await this.currentSubscription(workspaceId);
+    if (!currentSubscription)
+      throw new NotFoundException('현재 구독 정보를 찾을 수 없습니다.');
+
+    const updatedSubscription =
+      await this.prismaService.subscriptionModel.findUnique({
+        where: { id: subscriptionId },
+      });
+    if (!updatedSubscription)
+      throw new NotFoundException('변경할 구독 정보를 찾을 수 없습니다.');
+
+    const { subscription } = currentSubscription;
+    const { price: subscriptionPrice } = subscription;
+    const { price: updatedSubscriptionPrice } = updatedSubscription;
+
+    const currentDate = new Date();
+    const usedDays = Math.floor(
+      (currentDate.getTime() - currentSubscription.startedAt.getTime()) /
+        (1000 * 60 * 60 * 24),
+    );
+
+    return this.calculateAdditionalPayment(
+      subscriptionPrice,
+      updatedSubscriptionPrice,
+      usedDays,
+    );
   }
 
   // 추가 결제 비용 계산
@@ -978,29 +1012,28 @@ export class PurchaseService {
       }),
     );
 
-
     const maskedCardNumber = dto.number.replace(/\d{4}(?=\d{4})/g, '**** ');
 
     return await this.prismaService.$transaction(async (transaction) => {
       const billing = await transaction.workspaceBilling.upsert({
         where: { workspaceId },
-      update: {
-        workspaceId,
-        billingKey: billingKeyResponse,
-        cardNumber: maskedCardNumber,
-        hashedCardNumber,
-      },
-      create: {
-        workspaceId,
-        billingKey: billingKeyResponse,
-        cardNumber: maskedCardNumber,
-        hashedCardNumber,
+        update: {
+          workspaceId,
+          billingKey: billingKeyResponse,
+          cardNumber: maskedCardNumber,
+          hashedCardNumber,
+        },
+        create: {
+          workspaceId,
+          billingKey: billingKeyResponse,
+          cardNumber: maskedCardNumber,
+          hashedCardNumber,
         },
       });
       await this.changeBilling(workspaceId, billing.id, transaction);
 
       return billing;
-    })
+    });
   }
 
   // 결제 정보 삭제
@@ -1063,13 +1096,13 @@ export class PurchaseService {
         throw new NotAcceptableException('이미 기본 결제 정보입니다.');
 
       await transaction.workspaceBilling.updateMany({
-        where: { workspaceId, },
-        data: { },
+        where: { workspaceId },
+        data: {},
       });
 
       const updatedBilling = await transaction.workspaceBilling.update({
         where: { id: billingId, workspaceId },
-        data: { },
+        data: {},
       });
 
       const updatedSchedules = await this.changeBilling(
@@ -1156,7 +1189,7 @@ export class PurchaseService {
       return await transaction.purchaseHistory.update({
         where: { id: paymentId },
         data: { status: paymentResult.status },
-        include: {subscription: true}
+        include: { subscription: true },
       });
     });
   }
@@ -1191,7 +1224,6 @@ export class PurchaseService {
 
     if (purchase.type === PurchaseType.CREDIT)
       return this.completeCreditPurchase(paymentId);
-
   }
 
   // 결제 실패
@@ -1214,7 +1246,10 @@ export class PurchaseService {
     });
   }
 
-  public countPurchaseHistory(workspaceId: number, query: PurchaseHistoryQueryDto) {
+  public countPurchaseHistory(
+    workspaceId: number,
+    query: PurchaseHistoryQueryDto,
+  ) {
     const { type } = query;
 
     return this.prismaService.purchaseHistory.count({
@@ -1226,7 +1261,10 @@ export class PurchaseService {
     });
   }
 
-  public getPurchaseHistory(workspaceId: number, query: PurchaseHistoryQueryDto) {
+  public getPurchaseHistory(
+    workspaceId: number,
+    query: PurchaseHistoryQueryDto,
+  ) {
     const { type, skip, take } = query;
 
     return this.prismaService.purchaseHistory.findMany({

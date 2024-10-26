@@ -44,21 +44,30 @@ export class SmartstoreService {
       applicationSecret,
     );
 
+    const removedDuplicatedProductOrderIds = [...new Set(productOrderIds)];
+
     try {
-      await this.httpService.post(
-        '/v1/pay-order/seller/product-orders/dispatch',
-        {
-          dispatchProductOrders: productOrderIds.map((productOrderId) => ({
-            productOrderId,
-            deliveryMethod: 'DIRECT_DELIVERY',
-            dispatchDate: new Date().toISOString(),
-          })),
-        },
-        { headers: { Authorization: `Bearer ${accessToken}` } },
+      const dispatchResponse = await firstValueFrom(
+        this.httpService.post(
+          '/v1/pay-order/seller/product-orders/dispatch',
+          {
+            dispatchProductOrders: removedDuplicatedProductOrderIds.map(
+              (productOrderId) => ({
+                productOrderId,
+                deliveryMethod: 'DIRECT_DELIVERY',
+                dispatchDate: new Date().toISOString(),
+              }),
+            ),
+          },
+          { headers: { Authorization: `Bearer ${accessToken}` } },
+        ),
       );
+
+      return dispatchResponse.data;
     } catch (error) {
       await this.handleCommerceError(error, applicationId);
-      this.logger.error(error);
+      this.logger.error(error, error.response.data);
+      throw error;
     }
   }
 

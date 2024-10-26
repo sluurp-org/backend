@@ -1,4 +1,4 @@
-import { Injectable, NotAcceptableException } from '@nestjs/common';
+import { Injectable, Logger, NotAcceptableException } from '@nestjs/common';
 import {
   EventStatus,
   KakaoTemplateStatus,
@@ -22,6 +22,8 @@ import { CreditService } from 'src/credit/credit.service';
 
 @Injectable()
 export class WorkerService {
+  private readonly logger = new Logger(WorkerService.name);
+
   constructor(
     private readonly orderService: OrderService,
     private readonly smartstoreService: SmartstoreService,
@@ -252,15 +254,15 @@ export class WorkerService {
       return acc;
     }, {});
 
-    await Promise.allSettled(
+    const results = await Promise.allSettled(
       Object.values(eventHistoryGroupByStore).map(
-        ({ type, applicationId, applicationSecret, events }) => {
+        async ({ type, applicationId, applicationSecret, events }) => {
           if (type !== StoreType.SMARTSTORE)
             throw new NotAcceptableException(
               '배송 처리는 스마트스토어에서만 가능합니다.',
             );
 
-          return this.smartstoreService.completeDelivery(
+          return await this.smartstoreService.completeDelivery(
             applicationId,
             applicationSecret,
             events.map((event) => event.order.productOrderId),
@@ -268,6 +270,12 @@ export class WorkerService {
         },
       ),
     );
+
+    const failedEvents = results
+      .filter((result) => result.status === 'rejected')
+      .map((result) => result.reason);
+
+    this.logger.error(failedEvents);
   }
 
   public async sendStoreCronJob() {

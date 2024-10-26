@@ -343,7 +343,7 @@ export class EventService {
       productName: product?.name || '-',
       productVariantName: productVariant?.name || '-',
       orderAt: orderAt
-        ? format(orderAt, 'yyyy-MM-DD HH:mm', {
+        ? format(orderAt, 'yyyy-MM-dd HH:mm', {
             locale: ko,
           })
         : '-',

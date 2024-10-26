@@ -15,14 +15,14 @@ export class EventHistoryWorkspaceService {
         order: { workspaceId },
       },
       include: {
-        content: true,
+        contents: {
+          include: {
+            content: true,
+          },
+        },
         event: {
           include: {
-            message: {
-              include: {
-                contentGroup: true,
-              },
-            },
+            message: true,
           },
         },
       },
@@ -30,7 +30,10 @@ export class EventHistoryWorkspaceService {
     if (!eventHistory)
       throw new NotFoundException('이벤트 기록이 존재하지 않습니다.');
 
-    return eventHistory;
+    return {
+      ...eventHistory,
+      eventMessage: eventHistory.event.message,
+    };
   }
 
   public async findAll(
@@ -66,25 +69,27 @@ export class EventHistoryWorkspaceService {
 
   public async update(
     workspaceId: number,
-    eventHistoryId: string,
+    eventHistoryContentId: number,
     body: EventHistoryWorkspaceUpdateBodyDto,
   ) {
-    const eventHistory = await this.findOne(workspaceId, eventHistoryId);
+    const updatedEventHistory =
+      await this.prisma.eventHistoryContentConnection.update({
+        where: { id: eventHistoryContentId, eventHistory: { workspaceId } },
+        data: body,
+      });
 
-    const updatedEventHistory = await this.prisma.eventHistory.update({
-      where: { id: eventHistory.id, order: { workspaceId } },
-      data: body,
-    });
     return updatedEventHistory;
   }
 
-  public async resetDownloadCount(workspaceId: number, eventHistoryId: string) {
-    const eventHistory = await this.findOne(workspaceId, eventHistoryId);
-
-    const updatedEventHistory = await this.prisma.eventHistory.update({
-      where: { id: eventHistory.id, order: { workspaceId } },
-      data: { downloadCount: 0 },
-    });
+  public async resetDownloadCount(
+    workspaceId: number,
+    eventHistoryContentId: number,
+  ) {
+    const updatedEventHistory =
+      await this.prisma.eventHistoryContentConnection.update({
+        where: { id: eventHistoryContentId, eventHistory: { workspaceId } },
+        data: { downloadCount: 0 },
+      });
     return updatedEventHistory;
   }
 }

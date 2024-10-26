@@ -94,23 +94,22 @@ model Workspace {
   workspaceCredit  WorkspaceCredit[]
   purchaseHistory  PurchaseHistory[]
   workspaceBilling WorkspaceBilling?
-  EventHistory     EventHistory[]
+  eventHistory     EventHistory[]
 }
 
 model WorkspaceBilling {
-  id               Int    @id @default(autoincrement())
-  workspaceId      Int    @unique
-  cardNumber       String
-  hashedCardNumber String
-  billingKey       String @unique
+  id          Int    @id @default(autoincrement())
+  workspaceId Int
+  cardNumber  String
+  billingKey  String @unique
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @default(now()) @updatedAt
-  PurchaseHistory PurchaseHistory[]
+  purchaseHistory PurchaseHistory[]
 
-  @@unique([workspaceId, hashedCardNumber])
+  @@unique([workspaceId])
 }
 
 model WorkspaceCredit {
@@ -127,8 +126,8 @@ model WorkspaceCredit {
   createdAt       DateTime          @default(now())
   updatedAt       DateTime          @default(now()) @updatedAt
   deletedAt       DateTime?
-  PurchaseHistory PurchaseHistory[]
-  EventHistory    EventHistory[]
+  purchaseHistory PurchaseHistory[]
+  eventHistory    EventHistory[]
 }
 
 enum CreditType {
@@ -352,6 +351,7 @@ model Content {
 
   // text type QR code, barcode, url, etc...
   text String?
+  type ContentType @default(TEXT)
 
   // file type
   status    ContentStatus @default(PENDING)
@@ -364,11 +364,10 @@ model Content {
   contentGroup ContentGroup @relation(fields: [contentGroupId], references: [id])
   workspace    Workspace    @relation(fields: [workspaceId], references: [id])
 
-  createdAt DateTime  @default(now())
-  updatedAt DateTime  @default(now()) @updatedAt
-  deletedAt DateTime?
-
-  eventHistory EventHistory[]
+  createdAt            DateTime                        @default(now())
+  updatedAt            DateTime                        @default(now()) @updatedAt
+  deletedAt            DateTime?
+  eventHistoryContents EventHistoryContentConnection[]
 }
 
 enum ContentStatus {
@@ -409,21 +408,35 @@ model Event {
   @@unique([productId, productVariantId, messageId, type])
 }
 
+model EventHistoryContentConnection {
+  id Int @id @default(autoincrement())
+
+  eventHistoryId String
+  contentId      Int
+
+  eventHistory    EventHistory @relation(fields: [eventHistoryId], references: [id])
+  content         Content      @relation(fields: [contentId], references: [id])
+  downloadCount   Int          @default(0)
+  downloadLimit   Int?
+  disableDownload Boolean      @default(false)
+  lastDownloadAt  DateTime?
+  firstDownloadAt DateTime?
+  expiredAt       DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
 model EventHistory {
   id          String @id @default(uuid())
   workspaceId Int
   eventId     Int?
   orderId     Int?
-  contentId   Int?
   messageId   Int?
   creditId    Int?
 
   messageContent   String? @db.LongText
   messageVariables Json?
-
-  expiredAt       DateTime?
-  downloadCount   Int       @default(0)
-  disableDownload Boolean   @default(false)
 
   status  EventStatus
   message String?
@@ -435,13 +448,13 @@ model EventHistory {
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  workspace       Workspace        @relation(fields: [workspaceId], references: [id])
-  credit          WorkspaceCredit? @relation(fields: [creditId], references: [id])
-  content         Content?         @relation(fields: [contentId], references: [id], onUpdate: Cascade, onDelete: SetNull)
-  event           Event?           @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  order           Order?           @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  messageTemplate MessageTemplate? @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  workspace       Workspace                       @relation(fields: [workspaceId], references: [id])
+  credit          WorkspaceCredit?                @relation(fields: [creditId], references: [id])
+  event           Event?                          @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  order           Order?                          @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  messageTemplate MessageTemplate?                @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   orderHistory    OrderHistory[]
+  contents        EventHistoryContentConnection[]
 }
 
 enum EventStatus {
@@ -523,11 +536,13 @@ model SubscriptionModel {
   description String?
   price       Int
 
-  isContentEnabled Boolean @default(false)
+  isContentEnabled     Boolean @default(false)
+  isMessageEnabled     Boolean @default(false)
+  isCustomKakaoEnabled Boolean @default(false)
 
   contentLimit Int @default(0)
   messageLimit Int @default(0)
-  storeLimit   Int @default(0)
+  storeLimit   Int @default(1)
 
   contentCredit  Int @default(30)
   alimTalkCredit Int @default(20)

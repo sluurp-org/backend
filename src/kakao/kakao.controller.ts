@@ -10,7 +10,7 @@ import { KakaoService } from './kakao.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
 import { ReqWorkspace } from 'src/common/decorators/req-workspace.decorator';
-import { Workspace, WorkspaceRole } from '@prisma/client';
+import { SubscriptionModel, Workspace, WorkspaceRole } from '@prisma/client';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
 import { KakaoDto } from './dto/res/kakao.dto';
 import { Serialize } from 'src/common/decorators/serialize.decorator';
@@ -18,6 +18,7 @@ import { ConnectChannelBodyDto } from './dto/req/connect-channel-body.dto';
 import { RequestChannelTokenBodyDto } from './dto/req/request-channel-token-body.dto';
 import { KakaoCategoryDto } from './dto/res/kakao-categories.dto';
 import { FileInterceptor } from '@nestjs/platform-express';
+import { ReqSubscription } from 'src/common/decorators/req-subscription.decorator';
 
 @ApiTags('kakao')
 @WorkspaceController('kakao')
@@ -101,8 +102,13 @@ export class KakaoController {
   async createWorkspaceKakao(
     @ReqWorkspace() { id }: Workspace,
     @Body() dto: ConnectChannelBodyDto,
+    @ReqSubscription() workspaceSubscription: SubscriptionModel,
   ) {
-    return this.kakaoService.connectKakaoChannel(id, dto);
+    return this.kakaoService.connectKakaoChannel(
+      id,
+      dto,
+      workspaceSubscription,
+    );
   }
 
   @Delete()

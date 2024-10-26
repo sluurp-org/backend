@@ -19,6 +19,7 @@ import { KakaoTemplateStatusBodyDto } from './dto/req/kakao-template-status-body
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.dto';
 import { CreditService } from 'src/credit/credit.service';
+import { PurchaseService } from 'src/purchase/purchase.service';
 
 @Injectable()
 export class WorkerService {
@@ -30,7 +31,12 @@ export class WorkerService {
     private readonly storeService: StoreService,
     private readonly prismaService: PrismaService,
     private readonly creditService: CreditService,
+    private readonly purchaseService: PurchaseService,
   ) {}
+
+  public async sendPurchaseCronJob() {
+    return this.purchaseService.expiredWorkspaces();
+  }
 
   public async findOrdersByBatchQuery(
     dto: FindOrderBatchQueryDto,
@@ -128,6 +134,7 @@ export class WorkerService {
           const event = await tx.eventHistory.findUnique({
             where: { id: eventId },
             include: {
+              contents: true,
               order: {
                 include: {
                   store: {
@@ -179,9 +186,9 @@ export class WorkerService {
             );
           }
 
-          if (event.contentId) {
-            await tx.content.update({
-              where: { id: event.contentId },
+          if (event.contents) {
+            await tx.content.updateMany({
+              where: { id: { in: event.contents.map(({ id }) => id) } },
               data: { used: false },
             });
           }

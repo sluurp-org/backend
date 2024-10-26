@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, StoreType } from '@prisma/client';
+import { Prisma, StoreType, SubscriptionModel } from '@prisma/client';
 import { FindStoreQueryDto } from './dto/req/find-store-query.dto';
 import { CreateStoreBodyDto } from './dto/req/create-store-body.dto';
 import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
@@ -81,11 +81,34 @@ export class StoreService {
     }
   }
 
+  private async checkStoreLimit(
+    workspaceId: number,
+    workspaceSubscription?: SubscriptionModel,
+  ) {
+    if (!workspaceSubscription)
+      throw new BadRequestException(
+        '스토어를 생성하기 위해 먼저 워크스페이스 구독이 필요합니다.',
+      );
+
+    const storeCount = await this.prismaService.store.count({
+      where: { workspaceId },
+    });
+
+    const { storeLimit } = workspaceSubscription;
+
+    if (storeCount >= storeLimit && storeLimit !== 0)
+      throw new BadRequestException(
+        `스토어 생성 가능 개수를 초과하였습니다. 최대 ${storeLimit}개까지 생성 가능합니다.`,
+      );
+  }
+
   public async create(
     workspaceId: number,
     createStoreBodyDto: CreateStoreBodyDto,
+    workspaceSubscription?: SubscriptionModel,
   ) {
     const { type, smartStoreCredentials, ...rest } = createStoreBodyDto;
+    await this.checkStoreLimit(workspaceId, workspaceSubscription);
 
     if (type === StoreType.SMARTSTORE && !smartStoreCredentials)
       throw new BadRequestException(

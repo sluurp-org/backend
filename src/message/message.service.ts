@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   Logger,
   NotAcceptableException,
@@ -7,7 +8,12 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
-import { KakaoTemplateStatus, Prisma, Variables } from '@prisma/client';
+import {
+  KakaoTemplateStatus,
+  Prisma,
+  SubscriptionModel,
+  Variables,
+} from '@prisma/client';
 import {
   CreateKakaoTemplateBodyDto,
   KakaoTemplateButton,
@@ -98,7 +104,41 @@ export class MessageService {
     };
   }
 
-  public async createMessage(workspaceId: number, dto: CreateMessageBodyDto) {
+  private async checkMessageLimit(
+    workspaceId: number,
+    workspaceSubscription?: SubscriptionModel,
+  ) {
+    if (!workspaceSubscription)
+      throw new BadRequestException(
+        '메시지 템플릿을 생성하기 위해 먼저 워크스페이스 구독이 필요합니다.',
+      );
+
+    if (!workspaceSubscription.isMessageEnabled) {
+      throw new BadRequestException(
+        '메시지 기능이 비활성화되었습니다. 해당 플랜에서는 빠른시작형 메시지만 사용 가능합니다.',
+      );
+    }
+
+    const messageCount = await this.prismaService.messageTemplate.count({
+      where: { workspaceId },
+    });
+
+    const { messageLimit } = workspaceSubscription;
+
+    if (messageLimit !== 0 && messageCount >= messageLimit) {
+      throw new BadRequestException(
+        `메시지 템플릿 생성 가능 개수를 초과하였습니다. 최대 ${messageLimit}개까지 생성 가능합니다.`,
+      );
+    }
+  }
+
+  public async createMessage(
+    workspaceId: number,
+    dto: CreateMessageBodyDto,
+    workspaceSubscription?: SubscriptionModel,
+  ) {
+    await this.checkMessageLimit(workspaceId, workspaceSubscription);
+
     const { name, kakaoTemplate, ...rest } = dto;
     return this.prismaService.$transaction(async (tx) => {
       const message = await tx.messageTemplate.create({

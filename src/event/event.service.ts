@@ -85,7 +85,11 @@ export class EventService {
       },
       include: {
         event: true,
-        content: true,
+        contents: {
+          include: {
+            content: true,
+          },
+        },
         order: {
           include: {
             product: true,
@@ -160,14 +164,13 @@ export class EventService {
       | 'event'
       | 'order'
       | 'credit'
-      | 'content'
-      | 'expiredAt'
+      | 'contents'
       | 'status'
       | 'message'
       | 'messageTemplate'
     >
   > {
-    const { id: orderId, receiverPhone, workspaceId } = order;
+    const { id: orderId, receiverPhone, workspaceId, quantity } = order;
     const {
       id: eventId,
       message: { id: messageId, contentGroup },
@@ -191,16 +194,19 @@ export class EventService {
       try {
         const { id: contentGroupId, expireMinute, oneTime } = contentGroup;
 
-        const content = await this.contentService.findAvailableContent(
+        const contents = await this.contentService.findAvailableContent(
           contentGroupId,
+          oneTime ? quantity : 1,
           transaction,
         );
 
         if (oneTime) {
-          await this.contentService.markContentAsUsed(content.id, transaction);
+          await this.contentService.markContentAsUsed(
+            contents.map(({ id }) => id),
+            transaction,
+          );
         }
 
-        const { id: contentId } = content;
         const usedCredit = await this.creditService.use(workspaceId, {
           amount: contentCredit + alimTalkCredit,
           reason: '콘텐츠 메세지 발송 (알림톡 + 콘텐츠)',
@@ -214,8 +220,15 @@ export class EventService {
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
           credit: { connect: { id: usedCredit.id } },
-          content: { connect: { id: contentId } },
-          expiredAt: expireMinute ? expireAt : null,
+          contents: {
+            createMany: {
+              data: contents.map(({ id, contentGroup }) => ({
+                contentId: id,
+                expiredAt: expireMinute ? expireAt : null,
+                downloadLimit: contentGroup.downloadLimit,
+              })),
+            },
+          },
           status: EventStatus.CONTENT_READY,
         };
       } catch (error) {

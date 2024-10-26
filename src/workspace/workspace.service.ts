@@ -9,11 +9,15 @@ import { WorkspaceRole, WorkspaceUser } from '@prisma/client';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { CreditService } from 'src/credit/credit.service';
 
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly creditService: CreditService,
+  ) {}
 
   public async findOneById(id: number) {
     try {
@@ -56,19 +60,31 @@ export class WorkspaceService {
     createWorkspaceDto: CreateWorkspaceDto,
   ) {
     try {
-      const workspace = await this.prismaService.workspace.create({
-        data: {
-          ...createWorkspaceDto,
-          workspaceUser: {
-            create: {
-              user: { connect: { id: userId } },
-              role: WorkspaceRole.OWNER,
+      return await this.prismaService.$transaction(async (tx) => {
+        const workspace = await tx.workspace.create({
+          data: {
+            ...createWorkspaceDto,
+            workspaceUser: {
+              create: {
+                user: { connect: { id: userId } },
+                role: WorkspaceRole.OWNER,
+              },
             },
           },
-        },
-      });
+        });
 
-      return workspace;
+        await this.creditService.create(
+          workspace.id,
+          {
+            amount: 500,
+            expireAfterDays: 30,
+            reason: '워크스페이스 기본 크레딧 지급',
+          },
+          tx,
+        );
+
+        return workspace;
+      });
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(

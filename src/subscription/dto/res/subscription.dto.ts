@@ -1,5 +1,5 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { Exclude, Expose } from "class-transformer";
+import { ApiProperty } from '@nestjs/swagger';
+import { Exclude, Expose } from 'class-transformer';
 
 export class GetSubscriptionProductsResponseDto {
   @ApiProperty({
@@ -16,7 +16,7 @@ export class GetSubscriptionProductsResponseDto {
   @Expose()
   name: string;
 
-  @ApiProperty({  
+  @ApiProperty({
     description: '구독 상품 설명',
     example: 'Basic 플랜',
   })
@@ -29,6 +29,13 @@ export class GetSubscriptionProductsResponseDto {
   })
   @Expose()
   price: number;
+
+  @ApiProperty({
+    description: '메시지 사용 여부',
+    example: true,
+  })
+  @Expose()
+  isMessageEnabled: boolean;
 
   @ApiProperty({
     description: '콘텐츠 사용 여부',
@@ -50,7 +57,6 @@ export class GetSubscriptionProductsResponseDto {
   })
   @Expose()
   messageLimit: number;
-
 
   @ApiProperty({
     description: '스토어 갯수',
@@ -79,10 +85,10 @@ export class GetSubscriptionProductsResponseDto {
   })
   @Expose()
   emailCredit: number;
-  
+
   @Exclude()
   createdAt: Date;
-  
+
   @Exclude()
   updatedAt: Date;
 }

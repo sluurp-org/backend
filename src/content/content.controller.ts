@@ -2,7 +2,7 @@ import { Body, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { ContentService } from './content.service';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
-import { Workspace, WorkspaceRole } from '@prisma/client';
+import { SubscriptionModel, Workspace, WorkspaceRole } from '@prisma/client';
 import { ReqWorkspace } from 'src/common/decorators/req-workspace.decorator';
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
 import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
@@ -16,6 +16,7 @@ import { FindContentQueryDto } from './dto/req/find-content-query.dto copy';
 import { CreateContentBodyDto } from './dto/req/create-content-body.dto';
 import { UpdateContentBodyDto } from './dto/req/update-content-body.dto.ts';
 import { CreateContentFileBodyDto } from './dto/req/create-content-file-body.dto';
+import { ReqSubscription } from 'src/common/decorators/req-subscription.decorator';
 
 @ApiTags('content')
 @WorkspaceController('content-group')
@@ -64,8 +65,9 @@ export class ContentController {
   async createGroup(
     @ReqWorkspace() { id }: Workspace,
     @Body() dto: CreateContentGroupBodyDto,
+    @ReqSubscription() workspaceSubscription?: SubscriptionModel,
   ) {
-    return this.contentService.createGroup(id, dto);
+    return this.contentService.createGroup(id, dto, workspaceSubscription);
   }
 
   @ApiOperation({

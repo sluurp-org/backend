@@ -1,6 +1,6 @@
 import { Get, Body, Delete, Param, Post, Query, Patch } from '@nestjs/common';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Workspace, WorkspaceRole } from '@prisma/client';
+import { SubscriptionModel, Workspace, WorkspaceRole } from '@prisma/client';
 
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
@@ -13,6 +13,7 @@ import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { StoreDto } from './dto/res/store.dto';
 import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
 import { StoreListDto } from './dto/res/store-list.dto';
+import { ReqSubscription } from 'src/common/decorators/req-subscription.decorator';
 
 @ApiTags('store')
 @WorkspaceController('store')
@@ -74,8 +75,13 @@ export class StoreController {
   async create(
     @ReqWorkspace() workspace: Workspace,
     @Body() createStoreBodyDto: CreateStoreBodyDto,
+    @ReqSubscription() workspaceSubscription?: SubscriptionModel,
   ) {
-    return this.storeService.create(workspace.id, createStoreBodyDto);
+    return this.storeService.create(
+      workspace.id,
+      createStoreBodyDto,
+      workspaceSubscription,
+    );
   }
 
   @ApiOperation({

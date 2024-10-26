@@ -19,6 +19,7 @@ import { ConnectChannelBodyDto } from './dto/req/connect-channel-body.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import sizeOf from 'image-size';
+import { SubscriptionModel } from '@prisma/client';
 
 @Injectable()
 export class KakaoService {
@@ -99,32 +100,35 @@ export class KakaoService {
       'SOLAPI_CHANNEL_GROUP_ID',
     );
 
-    const createInviteResult = await firstValueFrom(this.httpService.post(
-      `/kakao/v2/channel-groups/invitations/${SOLAPI_CHANNEL_GROUP_ID}`,
-      {
-        channelId,
-      },
-      {
-        headers: {
-          Authorization: this.generateAccessToken(),
+    const createInviteResult = await firstValueFrom(
+      this.httpService.post(
+        `/kakao/v2/channel-groups/invitations/${SOLAPI_CHANNEL_GROUP_ID}`,
+        {
+          channelId,
         },
-      },
-    ));
+        {
+          headers: {
+            Authorization: this.generateAccessToken(),
+          },
+        },
+      ),
+    );
     if (!createInviteResult.data.invitationId)
       throw new InternalServerErrorException(
         '카카오 템플릿 그룹 초대에 실패했습니다.',
       );
 
-
-    const acceptInviteResult = await firstValueFrom(this.httpService.post(
-      `/kakao/v2/channel-groups/invitations/${createInviteResult.data.invitationId}/accept`,
-      {},
-      {
-        headers: {
-          Authorization: this.generateAccessToken(),
+    const acceptInviteResult = await firstValueFrom(
+      this.httpService.post(
+        `/kakao/v2/channel-groups/invitations/${createInviteResult.data.invitationId}/accept`,
+        {},
+        {
+          headers: {
+            Authorization: this.generateAccessToken(),
+          },
         },
-      },
-    ));
+      ),
+    );
     if (acceptInviteResult.data.status !== 'ACCEPTED')
       throw new InternalServerErrorException(
         '카카오 템플릿 그룹 초대 수락에 실패했습니다.',
@@ -136,7 +140,16 @@ export class KakaoService {
   public async connectKakaoChannel(
     workspaceId: number,
     dto: ConnectChannelBodyDto,
+    workspaceSubscription?: SubscriptionModel,
   ) {
+    if (!workspaceSubscription)
+      throw new BadRequestException('워크스페이스 구독이 필요합니다.');
+
+    if (!workspaceSubscription.isCustomKakaoEnabled)
+      throw new BadRequestException(
+        '카카오 채널 연동 기능이 비활성화되었습니다. 상위 플랜이 필요합니다.',
+      );
+
     const kakaoCredential = await this.prismaService.kakaoCredential.findUnique(
       { where: { workspaceId } },
     );
@@ -174,7 +187,16 @@ export class KakaoService {
   }
 
   public async createKakaoTemplate(
-    dto: Pick<CreateKakaoAlimtalkTemplateRequest, 'name' | 'content' | 'categoryCode' | 'buttons' | 'quickReplies' | 'extra' | 'imageId'>,
+    dto: Pick<
+      CreateKakaoAlimtalkTemplateRequest,
+      | 'name'
+      | 'content'
+      | 'categoryCode'
+      | 'buttons'
+      | 'quickReplies'
+      | 'extra'
+      | 'imageId'
+    >,
   ) {
     const channelGroupId = this.configService.get<string>(
       'SOLAPI_CHANNEL_GROUP_ID',

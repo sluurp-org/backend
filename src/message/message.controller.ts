@@ -1,7 +1,7 @@
 import { Body, Delete, Get, Param, Patch, Post, Query } from '@nestjs/common';
 import { MessageService } from './message.service';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
-import { Workspace, WorkspaceRole } from '@prisma/client';
+import { SubscriptionModel, Workspace, WorkspaceRole } from '@prisma/client';
 import { ReqWorkspace } from 'src/common/decorators/req-workspace.decorator';
 import { CreateMessageBodyDto } from './dto/req/create-message-body.dto';
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
@@ -13,6 +13,7 @@ import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
 import { UpdateMessageBodyDto } from './dto/req/update-message-body.dto';
 import { MessageDto } from './dto/res/message.dto';
 import { VariablesDto } from './dto/res/variables.dto';
+import { ReqSubscription } from 'src/common/decorators/req-subscription.decorator';
 
 @ApiTags('message')
 @WorkspaceController('message')
@@ -90,10 +91,12 @@ export class MessageController {
   public async createMessage(
     @ReqWorkspace() workspace: Workspace,
     @Body() createMessageBodyDto: CreateMessageBodyDto,
+    @ReqSubscription() workspaceSubscription?: SubscriptionModel,
   ) {
     return this.messageService.createMessage(
       workspace.id,
       createMessageBodyDto,
+      workspaceSubscription,
     );
   }
 

@@ -16,7 +16,7 @@ class UserEventHistoryOrderDto {
     example: '2024019230123408',
   })
   orderId: string;
-  
+
   @Expose()
   @ApiProperty({
     description: '주문자명',
@@ -60,6 +60,84 @@ class UserEventHistoryOrderDto {
   })
   orderAt: Date;
 }
+class UserEventHistoryContentDto {
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 ID',
+    example: '1',
+  })
+  id: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 이름',
+    example: '콘텐츠 이름',
+  })
+  name: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 타입',
+    example: 'IMAGE',
+  })
+  type: ContentType;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 URL',
+    example: 'https://example.com/image.jpg',
+  })
+  url: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 다운로드 URL',
+    example: 'https://example.com/image.jpg',
+  })
+  downloadUrl: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '콘텐츠 만료 일시',
+    example: '2024-01-01',
+  })
+  expiredAt: Date;
+
+  @Expose()
+  @ApiProperty({
+    description: '다운로드 횟수',
+    example: 0,
+  })
+  downloadCount: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '다운로드 제한 횟수',
+    example: 0,
+  })
+  downloadLimit: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '다운로드 고유 아이디',
+    example: 1,
+  })
+  connectionId: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '다운로드 불가 안내 메시지',
+    example: '다운로드 불가 안내 메시지',
+  })
+  error: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '다운로드 가능 여부',
+    example: true,
+  })
+  downloadAvailable: boolean;
+}
 
 export class UserEventHistoryDto {
   @Expose()
@@ -71,36 +149,6 @@ export class UserEventHistoryDto {
 
   @Expose()
   @ApiProperty({
-    description: '상품 다운로드 만료 날짜',
-    example: '2024-01-01',
-    nullable: true,
-  })
-  expiredAt?: Date;
-
-  @Expose()
-  @ApiProperty({
-    description: '상품 다운로드 횟수',
-    example: 1,
-  })
-  downloadCount: number;
-
-  @Expose()
-  @ApiProperty({
-    description: '상품 다운로드 가능 여부',
-    example: false,
-  })
-  downloadAvailable: boolean;
-
-  @Expose()
-  @ApiProperty({
-    description: '상품 다운로드 에러 메시지',
-    example: '다운로드 에러',
-    nullable: true,
-  })
-  downloadError?: string;
-
-  @Expose()
-  @ApiProperty({
     description: '주문',
     type: UserEventHistoryOrderDto,
   })
@@ -109,14 +157,11 @@ export class UserEventHistoryDto {
 
   @Expose()
   @ApiProperty({
-    description: '콘텐츠 타입',
-    example: ContentType.FILE,
-    enum: ContentType,
+    description: '콘텐츠 목록',
+    type: UserEventHistoryContentDto,
   })
-  contentType: ContentType;
-
-  @Exclude()
-  disableDownload: boolean;
+  @Type(() => UserEventHistoryContentDto)
+  contents: UserEventHistoryContentDto[];
 
   @Exclude()
   processedAt: Date;

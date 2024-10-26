@@ -62,7 +62,7 @@ export class EventHistoryWorkspaceController {
     );
   }
 
-  @Patch(':eventHistoryId')
+  @Patch(':eventHistoryContentId')
   @Serialize(EventHistoryDto)
   @ApiOperation({
     summary: '이벤트 기록 수정',
@@ -73,18 +73,18 @@ export class EventHistoryWorkspaceController {
   })
   @WorkspaceAuth([WorkspaceRole.OWNER, WorkspaceRole.MEMBER])
   public async updateEventHistoryWorkspace(
-    @Param('eventHistoryId') eventHistoryId: string,
+    @Param('eventHistoryContentId') eventHistoryContentId: number,
     @ReqWorkspace() { id: workspaceId }: Workspace,
     @Body() body: EventHistoryWorkspaceUpdateBodyDto,
   ) {
     return this.eventHistoryWorkspaceService.update(
       workspaceId,
-      eventHistoryId,
+      eventHistoryContentId,
       body,
     );
   }
 
-  @Put(':eventHistoryId/reset-download-count')
+  @Put(':eventHistoryContentId/reset-download-count')
   @Serialize(EventHistoryDto)
   @ApiOperation({
     summary: '이벤트 기록 다운로드 횟수 초기화',
@@ -95,12 +95,12 @@ export class EventHistoryWorkspaceController {
   })
   @WorkspaceAuth([WorkspaceRole.OWNER, WorkspaceRole.MEMBER])
   public async resetDownloadCount(
-    @Param('eventHistoryId') eventHistoryId: string,
+    @Param('eventHistoryContentId') eventHistoryContentId: number,
     @ReqWorkspace() { id: workspaceId }: Workspace,
   ) {
     return this.eventHistoryWorkspaceService.resetDownloadCount(
       workspaceId,
-      eventHistoryId,
+      eventHistoryContentId,
     );
   }
 }

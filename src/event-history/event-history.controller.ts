@@ -19,12 +19,18 @@ export class EventHistoryController {
     return this.eventHistoryService.findOne(eventId);
   }
 
-  @Get(':eventId/download')
+  @Get(':eventId/:eventContentId/download')
   @ApiOperation({ summary: '이벤트 기록 다운로드' })
   @ApiOkResponse({ type: UserEventHistoryDownloadDto })
   @Serialize(UserEventHistoryDownloadDto)
-  public async downloadEventHistory(@Param('eventId') eventId: string) {
-    return this.eventHistoryService.downloadEventHistory(eventId);
+  public async downloadEventHistory(
+    @Param('eventId') eventId: string,
+    @Param('eventContentId') eventContentId: number,
+  ) {
+    return this.eventHistoryService.downloadEventHistory(
+      eventId,
+      eventContentId,
+    );
   }
 
   @Get(':eventId/confirm')

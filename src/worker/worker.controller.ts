@@ -136,6 +136,16 @@ export class WorkerController {
   }
 
   @ApiOperation({
+    summary: '결제 크론 웹훅',
+    description: '만료된 결제를 처리합니다.',
+  })
+  @Post('purchase/cron')
+  @WorkerAuth()
+  public async sendPurchaseCronJob() {
+    return await this.workerService.sendPurchaseCronJob();
+  }
+
+  @ApiOperation({
     summary: '솔라피 카카오 템플릿 상태 변경 웹훅',
     description: '솔라피 카카오 템플릿 상태 변경 웹훅을 처리합니다.',
   })
@@ -148,6 +158,11 @@ export class WorkerController {
   }
 
   @Post('solapi/message')
+  @ApiOperation({
+    summary: '솔라피 메세지 발송 결과 웹훅',
+    description: '솔라피 메세지 발송 결과 웹훅을 처리합니다.',
+  })
+  @WorkerAuth()
   public async handleSolapiMessageWebhook(
     @Body() dto: SolapiMessageStatuBodyDto[],
   ) {
@@ -155,6 +170,10 @@ export class WorkerController {
   }
 
   @Post('portone/webhook')
+  @ApiOperation({
+    summary: '포트원 웹훅',
+    description: '포트원 웹훅을 처리합니다.',
+  })
   @UseGuards(PortoneGuard)
   public async webhook(@Body() dto: WebhookBodyDto) {
     return this.purchaseService.webhook(dto);

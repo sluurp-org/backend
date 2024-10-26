@@ -18,7 +18,6 @@ import {
   WorkspaceBilling,
 } from '@prisma/client';
 import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
-import * as crypto from 'crypto';
 import { CreateCreditPurchaseOrderBodyDto } from './dto/req/create-credit-purchase-order-body.dto';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
 import { WebhookTypeEnum } from 'src/portone/enum/webhook.enum';
@@ -37,6 +36,90 @@ export class PurchaseService {
     private readonly creditService: CreditService,
     private readonly portoneService: PortoneService,
   ) {}
+
+  private async updateWorkspaceReadonly(workspaceId: number) {
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.store.updateMany({
+        where: { workspaceId },
+        data: { readonly: true },
+      });
+      await tx.contentGroup.updateMany({
+        where: { workspaceId },
+        data: { readonly: true },
+      });
+      await tx.messageTemplate.updateMany({
+        where: { workspaceId },
+        data: { readonly: true },
+      });
+      await tx.workspace.update({
+        where: { id: workspaceId },
+        data: { subscriptionId: null, subscriptionEndedAt: null },
+      });
+    });
+  }
+
+  public async expiredWorkspaces() {
+    const subsciprionExpiredWorkspaces =
+      await this.prismaService.workspace.findMany({
+        where: { subscriptionEndedAt: { lt: new Date() } },
+      });
+    if (subsciprionExpiredWorkspaces.length === 0) return [];
+
+    await Promise.allSettled(
+      subsciprionExpiredWorkspaces.map((workspace) =>
+        this.updateWorkspaceReadonly(workspace.id),
+      ),
+    );
+  }
+
+  private async updateWorkspaceSubscription(
+    workspaceId: number,
+    subscriptionId: number,
+    subscriptionEndedAt: Date,
+    transaction: Prisma.TransactionClient = this.prismaService,
+  ) {
+    return transaction.workspace.update({
+      where: { id: workspaceId },
+      data: { subscriptionId, subscriptionEndedAt },
+    });
+  }
+
+  private async updateWorkspaceLimits(
+    workspaceId: number,
+    subscription: SubscriptionModel,
+    expiredAt: Date,
+    transaction: Prisma.TransactionClient = this.prismaService,
+  ) {
+    const {
+      contentLimit,
+      messageLimit,
+      storeLimit,
+      isContentEnabled,
+      isMessageEnabled,
+    } = subscription;
+
+    await Promise.allSettled([
+      this.updateWorkspaceSubscription(
+        workspaceId,
+        subscription.id,
+        expiredAt,
+        transaction,
+      ),
+      this.updateContentReadonly(
+        workspaceId,
+        isContentEnabled,
+        contentLimit,
+        transaction,
+      ),
+      this.updateMessageReadonly(
+        workspaceId,
+        isMessageEnabled,
+        messageLimit,
+        transaction,
+      ),
+      this.updateStoreLimit(workspaceId, storeLimit, transaction),
+    ]);
+  }
 
   // 무료 평가판 불가능한지 확인
   public async isNotAvailableFreeTrial(
@@ -123,23 +206,6 @@ export class PurchaseService {
         status: PurchaseStatus.PAID,
       },
     });
-
-    const updatedWorkspace = await transaction.workspace.update({
-      where: { id: workspaceId },
-      data: {
-        subscriptionId,
-      },
-      include: { subscription: true },
-    });
-
-    const {
-      subscription: { contentLimit, messageLimit, storeLimit },
-    } = updatedWorkspace;
-    await Promise.allSettled([
-      this.updateContentReadonly(workspaceId, contentLimit, transaction),
-      this.updateMessageReadonly(workspaceId, messageLimit, transaction),
-      this.updateStoreLimit(workspaceId, storeLimit, transaction),
-    ]);
 
     return freeTrialPurchase;
   }
@@ -282,23 +348,6 @@ export class PurchaseService {
         },
       });
 
-      const updatedWorkspace = await transaction.workspace.update({
-        where: { id: workspaceId },
-        data: {
-          subscriptionId,
-        },
-        include: { subscription: true },
-      });
-
-      const {
-        subscription: { contentLimit, messageLimit, storeLimit },
-      } = updatedWorkspace;
-      await Promise.allSettled([
-        this.updateContentReadonly(workspaceId, contentLimit, transaction),
-        this.updateMessageReadonly(workspaceId, messageLimit, transaction),
-        this.updateStoreLimit(workspaceId, storeLimit, transaction),
-      ]);
-
       lastEndedAt = thisMonthSubscriptionEndAt;
       currentSubscription = thisMonthSubscription;
     }
@@ -312,6 +361,13 @@ export class PurchaseService {
       subscription,
       billing,
       nextSubscriptionStartAt,
+      transaction,
+    );
+
+    await this.updateWorkspaceLimits(
+      workspaceId,
+      subscription,
+      currentAvailableSubscription.endedAt,
       transaction,
     );
 
@@ -518,6 +574,7 @@ export class PurchaseService {
   // 컨텐츠 읽기 전용 처리
   private async updateContentReadonly(
     workspaceId: number,
+    contentAvailable: boolean,
     availableContentCount: number,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
@@ -527,14 +584,19 @@ export class PurchaseService {
       orderBy: { createdAt: 'asc' },
     });
 
+    if (!contentAvailable) {
+      return await transaction.contentGroup.updateMany({
+        where: { workspaceId, deletedAt: null },
+        data: { readonly: true },
+      });
+    }
+
     if (availableContentCount === 0) {
       return await transaction.contentGroup.updateMany({
         where: { workspaceId, deletedAt: null },
         data: { readonly: false },
       });
     }
-
-    if (availableContentCount >= contentGroups.length) return;
 
     const readonlyContentGroups = contentGroups.slice(availableContentCount);
     return await transaction.contentGroup.updateMany({
@@ -549,6 +611,7 @@ export class PurchaseService {
 
   private async updateMessageReadonly(
     workspaceId: number,
+    isMessageEnabled: boolean,
     availableMessageCount: number,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
@@ -556,6 +619,13 @@ export class PurchaseService {
       where: { workspaceId },
       orderBy: { createdAt: 'asc' },
     });
+
+    if (!isMessageEnabled) {
+      return await transaction.messageTemplate.updateMany({
+        where: { workspaceId },
+        data: { readonly: true },
+      });
+    }
 
     if (availableMessageCount === 0) {
       return await transaction.messageTemplate.updateMany({
@@ -638,22 +708,12 @@ export class PurchaseService {
         transaction,
       );
 
-      const updatedWorkspace = await transaction.workspace.update({
-        where: { id: workspace.id },
-        data: {
-          subscriptionId: purchase.subscriptionId,
-        },
-        include: { subscription: true },
-      });
-
-      const {
-        subscription: { contentLimit, messageLimit, storeLimit },
-      } = updatedWorkspace;
-      await Promise.allSettled([
-        this.updateContentReadonly(workspace.id, contentLimit, transaction),
-        this.updateMessageReadonly(workspace.id, messageLimit, transaction),
-        this.updateStoreLimit(workspace.id, storeLimit, transaction),
-      ]);
+      await this.updateWorkspaceSubscription(
+        workspace.id,
+        nextSubscription.subscriptionId,
+        nextSubscription.endedAt,
+        transaction,
+      );
 
       return nextSubscription;
     });
@@ -894,21 +954,12 @@ export class PurchaseService {
         include: { subscription: true },
       });
 
-      await transaction.workspace.update({
-        where: { id: workspaceId },
-        data: {
-          subscriptionId: updatedSubscription.subscriptionId,
-        },
-      });
-
-      const {
-        subscription: { contentLimit, messageLimit, storeLimit },
-      } = updatedSubscription;
-      await Promise.allSettled([
-        this.updateContentReadonly(workspace.id, contentLimit, transaction),
-        this.updateMessageReadonly(workspace.id, messageLimit, transaction),
-        this.updateStoreLimit(workspace.id, storeLimit, transaction),
-      ]);
+      await this.updateWorkspaceLimits(
+        workspaceId,
+        updatedSubscription.subscription,
+        updatedSubscription.endedAt,
+        transaction,
+      );
 
       return updatedSubscription;
     });
@@ -978,17 +1029,9 @@ export class PurchaseService {
     if (!workspace)
       throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
 
-    const hashedCardNumber = crypto
-      .createHash('sha512')
-      .update(dto.number)
-      .digest('hex');
-
     const cardExists = await this.prismaService.workspaceBilling.findUnique({
       where: {
-        workspaceId_hashedCardNumber: {
-          workspaceId,
-          hashedCardNumber,
-        },
+        workspaceId,
       },
     });
     if (cardExists) throw new NotAcceptableException('이미 등록된 카드입니다.');
@@ -1021,13 +1064,11 @@ export class PurchaseService {
           workspaceId,
           billingKey: billingKeyResponse,
           cardNumber: maskedCardNumber,
-          hashedCardNumber,
         },
         create: {
           workspaceId,
           billingKey: billingKeyResponse,
           cardNumber: maskedCardNumber,
-          hashedCardNumber,
         },
       });
       await this.changeBilling(workspaceId, billing.id, transaction);

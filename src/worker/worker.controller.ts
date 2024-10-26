@@ -162,7 +162,6 @@ export class WorkerController {
     summary: '솔라피 메세지 발송 결과 웹훅',
     description: '솔라피 메세지 발송 결과 웹훅을 처리합니다.',
   })
-  @WorkerAuth()
   public async handleSolapiMessageWebhook(
     @Body() dto: SolapiMessageStatuBodyDto[],
   ) {

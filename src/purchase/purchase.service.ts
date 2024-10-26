@@ -1066,12 +1066,7 @@ export class PurchaseService {
         transaction,
       );
 
-      const updatedSchedules = await this.changeBilling(
-        workspaceId,
-        defaultBilling.id,
-        transaction,
-      );
-      console.log(updatedSchedules);
+      await this.changeBilling(workspaceId, defaultBilling.id, transaction);
 
       await this.portoneService.deleteBillingKey(billing.billingKey);
 
@@ -1105,12 +1100,7 @@ export class PurchaseService {
         data: {},
       });
 
-      const updatedSchedules = await this.changeBilling(
-        workspaceId,
-        updatedBilling.id,
-        transaction,
-      );
-      console.log(updatedSchedules);
+      await this.changeBilling(workspaceId, updatedBilling.id, transaction);
 
       return updatedBilling;
     });

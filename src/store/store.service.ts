@@ -150,7 +150,6 @@ export class StoreService {
         applicationId,
         applicationSecret,
       );
-      console.log(storeInfo);
       if (storeInfo.channelId !== store.smartStoreCredentials.channelId)
         throw new BadRequestException(
           '변경하려는 스마트스토어 정보가 일치하지 않습니다.',

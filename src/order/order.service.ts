@@ -486,7 +486,7 @@ export class OrderService {
         const failedUpdatedOrders = updatedOrders
           .filter((result) => result.status === 'rejected')
           .map((result) => {
-            console.log(result);
+            console.error(result);
             return result.reason;
           });
 

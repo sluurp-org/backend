@@ -332,10 +332,6 @@ export class KakaoService {
         );
       } catch (error) {
         this.logger.error(error);
-        if (error.name !== 'ChannelNotFound') {
-          const message = error.message || '카카오 채널 삭제에 실패했습니다.';
-          throw new InternalServerErrorException(message);
-        }
       }
 
       await tx.messageTemplate.deleteMany({

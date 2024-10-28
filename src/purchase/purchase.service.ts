@@ -29,6 +29,7 @@ export class PurchaseService {
   private readonly FREE_TRIAL_DAYS = 30;
   private readonly MAX_RETRY_COUNT = 1;
   private readonly RETRY_HOUR = 2;
+  private readonly EXPIRE_AFTER_DAYS = 365;
   private readonly logger = new Logger(PurchaseService.name);
 
   constructor(
@@ -1201,6 +1202,7 @@ export class PurchaseService {
           {
             amount: purchase.amount,
             reason: purchase.reason,
+            expireAfterDays: this.EXPIRE_AFTER_DAYS,
           },
           transaction,
         );

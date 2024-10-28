@@ -10,8 +10,8 @@ export class PaginationQueryDto {
   })
   @IsOptional()
   @IsNumber()
-  @Min(5)
-  @Max(100)
+  @Min(1)
+  @Max(1000)
   @Type(() => Number)
   size: number;
 

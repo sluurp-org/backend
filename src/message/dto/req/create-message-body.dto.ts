@@ -1,14 +1,18 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
   IsBoolean,
+  IsEmail,
+  IsEnum,
   IsNotEmpty,
   IsNumber,
   IsOptional,
+  IsPhoneNumber,
   IsString,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateKakaoTemplateBodyDto } from './subtemplate/create-kakao-template-body.dto';
+import { MessageTarget } from '@prisma/client';
 
 export class CreateVariableBodyDto {
   @ApiProperty({
@@ -72,4 +76,33 @@ export class CreateMessageBodyDto {
   @Type(() => CreateVariableBodyDto)
   @ValidateNested({ each: true })
   variables: CreateVariableBodyDto[];
+
+  @ApiProperty({
+    description: '수신자 타입',
+    example: MessageTarget.BUYER,
+    enum: MessageTarget,
+  })
+  @IsEnum(MessageTarget)
+  @IsNotEmpty()
+  target: MessageTarget;
+
+  @ApiProperty({
+    description: '커스텀 전화번호',
+    example: '01012345678',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @IsPhoneNumber('KR')
+  customPhone?: string;
+
+  @ApiProperty({
+    description: '커스텀 이메일',
+    example: 'test@test.com',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  @IsEmail()
+  customEmail?: string;
 }

@@ -330,21 +330,23 @@ export class KakaoService {
         await this.solapiMessageService.removeKakaoChannel(
           kakaoCredential.channelId,
         );
-
-        await tx.messageTemplate.deleteMany({
-          where: {
-            workspaceId,
-          },
-        });
-
-        return tx.kakaoCredential.delete({
-          where: { id: kakaoCredential.id },
-        });
       } catch (error) {
         this.logger.error(error);
-        const message = error.message || '카카오 채널 삭제에 실패했습니다.';
-        throw new InternalServerErrorException(message);
+        if (error.name !== 'ChannelNotFound') {
+          const message = error.message || '카카오 채널 삭제에 실패했습니다.';
+          throw new InternalServerErrorException(message);
+        }
       }
+
+      await tx.messageTemplate.deleteMany({
+        where: {
+          workspaceId,
+        },
+      });
+
+      return tx.kakaoCredential.delete({
+        where: { id: kakaoCredential.id },
+      });
     });
   }
 

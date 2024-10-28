@@ -25,8 +25,8 @@ import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
 
 @Injectable()
 export class PurchaseService {
-  private readonly SUBSCRIPTION_MONTHS = 1;
-  private readonly FREE_TRIAL_DAYS = 7;
+  private readonly SUBSCRIPTION_DAYS = 30;
+  private readonly FREE_TRIAL_DAYS = 30;
   private readonly MAX_RETRY_COUNT = 1;
   private readonly RETRY_HOUR = 2;
   private readonly logger = new Logger(PurchaseService.name);
@@ -221,10 +221,9 @@ export class PurchaseService {
   ) {
     const nextSubscriptionStartAt = new Date(startAt);
     const nextSubscriptionEndAt = new Date(nextSubscriptionStartAt);
-    nextSubscriptionEndAt.setMonth(
-      nextSubscriptionEndAt.getMonth() + this.SUBSCRIPTION_MONTHS,
+    nextSubscriptionEndAt.setDate(
+      nextSubscriptionEndAt.getDate() + 1 + this.SUBSCRIPTION_DAYS,
     );
-    nextSubscriptionEndAt.setDate(nextSubscriptionEndAt.getDate() + 1);
     nextSubscriptionEndAt.setHours(0, 0, 0, 0);
 
     const {
@@ -301,11 +300,8 @@ export class PurchaseService {
     let currentSubscription: PurchaseHistory = currentAvailableSubscription;
     if (!currentAvailableSubscription) {
       const thisMonthSubscriptionEndAt = new Date(currentDate);
-      thisMonthSubscriptionEndAt.setMonth(
-        thisMonthSubscriptionEndAt.getMonth() + this.SUBSCRIPTION_MONTHS,
-      );
       thisMonthSubscriptionEndAt.setDate(
-        thisMonthSubscriptionEndAt.getDate() + 1,
+        thisMonthSubscriptionEndAt.getDate() + 1 + this.SUBSCRIPTION_DAYS,
       );
       thisMonthSubscriptionEndAt.setHours(0, 0, 0, 0);
 
@@ -381,6 +377,8 @@ export class PurchaseService {
     const currentSubscription = await this.currentSubscription(workspaceId);
     if (!currentSubscription)
       throw new NotFoundException('현재 구독 정보를 찾을 수 없습니다.');
+
+    if (currentSubscription.amount === 0) return 0;
 
     const updatedSubscription =
       await this.prismaService.subscriptionModel.findUnique({

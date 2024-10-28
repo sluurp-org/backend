@@ -1,11 +1,22 @@
 import { ApiProperty } from '@nestjs/swagger';
-import {
-  EventHistory,
-  EventStatus,
-  OrderHistoryType,
-  OrderStatus,
-} from '@prisma/client';
+import { EventStatus, OrderHistoryType, OrderStatus } from '@prisma/client';
 import { Exclude, Expose, Type } from 'class-transformer';
+
+export class EventHistoryMessageDto {
+  @Expose()
+  @ApiProperty({
+    description: '메세지 아이디',
+    example: 1,
+  })
+  id: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '메세지 명',
+    example: '테스트 발송 101.',
+  })
+  name: string;
+}
 
 export class EventHistoryDto {
   @Expose()
@@ -20,26 +31,6 @@ export class EventHistoryDto {
 
   @Exclude()
   orderId: number;
-
-  @Exclude()
-  orderHistoryId: number;
-
-  @Exclude()
-  contentId: number;
-
-  @Expose()
-  @ApiProperty({
-    description: '만료 일시',
-    example: '2021-07-01T00:00:00',
-  })
-  expiredAt: Date;
-
-  @Expose()
-  @ApiProperty({
-    description: '다운로드 횟수',
-    example: 1,
-  })
-  downloadCount: number;
 
   @Expose()
   @ApiProperty({
@@ -57,10 +48,18 @@ export class EventHistoryDto {
 
   @Expose()
   @ApiProperty({
-    description: '이벤트 처리 일시',
-    example: '2021-07-01T00:00:00',
+    description: '메세지 아이디',
+    example: 1,
   })
-  processedAt: Date;
+  messageId: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '메세지',
+    type: EventHistoryMessageDto,
+  })
+  @Type(() => EventHistoryMessageDto)
+  messageTemplate: EventHistoryMessageDto;
 
   @Exclude()
   solapiStatusCode: string;

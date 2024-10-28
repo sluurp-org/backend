@@ -237,6 +237,7 @@ export class OrderService {
         eventHistory: {
           include: {
             event: true,
+            messageTemplate: true,
           },
         },
       },

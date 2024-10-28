@@ -10,6 +10,7 @@ import { KakaoService } from 'src/kakao/kakao.service';
 import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
 import {
   KakaoTemplateStatus,
+  MessageTarget,
   Prisma,
   SubscriptionModel,
   Variables,
@@ -139,10 +140,18 @@ export class MessageService {
   ) {
     await this.checkMessageLimit(workspaceId, workspaceSubscription);
 
-    const { name, kakaoTemplate, ...rest } = dto;
+    const { name, kakaoTemplate, target, customPhone, customEmail, ...rest } =
+      dto;
+
+    if (target === MessageTarget.CUSTOM && !customPhone && !customEmail) {
+      throw new BadRequestException(
+        '커스텀 수신자 타입은 전화번호 입력이 필요합니다.',
+      );
+    }
+
     return this.prismaService.$transaction(async (tx) => {
       const message = await tx.messageTemplate.create({
-        data: { name, workspaceId, ...rest },
+        data: { name, workspaceId, target, customPhone, customEmail, ...rest },
       });
 
       await this.handleKakaoTemplateCreation(tx, message.id, kakaoTemplate);
@@ -271,8 +280,22 @@ export class MessageService {
       throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
     }
 
-    const { name, variables, contentGroupId, kakaoTemplate, completeDelivery } =
-      dto;
+    const {
+      name,
+      variables,
+      contentGroupId,
+      kakaoTemplate,
+      completeDelivery,
+      target,
+      customPhone,
+      customEmail,
+    } = dto;
+    if (target === MessageTarget.CUSTOM && !customPhone && !customEmail) {
+      throw new BadRequestException(
+        '커스텀 수신자 타입은 전화번호 입력이 필요합니다.',
+      );
+    }
+
     return this.prismaService.$transaction(async (tx) => {
       if (kakaoTemplate)
         await this.updateKakaoTemplate(tx, message, kakaoTemplate);
@@ -284,6 +307,9 @@ export class MessageService {
           variables: variables || [],
           contentGroupId,
           completeDelivery,
+          target,
+          customPhone,
+          customEmail,
         },
       });
     });

@@ -466,6 +466,12 @@ enum EventStatus {
   FAILED // 발송 실패
 }
 
+enum MessageTarget {
+  BUYER
+  RECEIVER
+  CUSTOM
+}
+
 model MessageTemplate {
   id               Int     @id @default(autoincrement())
   name             String
@@ -479,6 +485,10 @@ model MessageTemplate {
   workspaceId     Int?
   kakaoTemplateId Int?
   contentGroupId  Int?
+
+  target      MessageTarget?
+  customPhone String?
+  customEmail String?
 
   kakaoTemplate KakaoTemplate? @relation(fields: [kakaoTemplateId], references: [id], onDelete: Cascade, onUpdate: Cascade)
   workspace     Workspace?     @relation(fields: [workspaceId], references: [id])

@@ -14,6 +14,8 @@ import { CreditService } from 'src/credit/credit.service';
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
+  private readonly FREE_WORKSPACE_CREDIT = 3000;
+
   constructor(
     private readonly prismaService: PrismaService,
     private readonly creditService: CreditService,
@@ -76,7 +78,7 @@ export class WorkspaceService {
         await this.creditService.create(
           workspace.id,
           {
-            amount: 500,
+            amount: this.FREE_WORKSPACE_CREDIT,
             expireAfterDays: 30,
             reason: '워크스페이스 기본 크레딧 지급',
           },

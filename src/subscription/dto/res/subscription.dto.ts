@@ -45,6 +45,13 @@ export class GetSubscriptionProductsResponseDto {
   isContentEnabled: boolean;
 
   @ApiProperty({
+    description: '커스텀 카카오 사용 여부',
+    example: true,
+  })
+  @Expose()
+  isCustomKakaoEnabled: boolean;
+
+  @ApiProperty({
     description: '콘텐츠 갯수',
     example: 3,
   })

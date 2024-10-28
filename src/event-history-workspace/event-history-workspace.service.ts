@@ -32,7 +32,7 @@ export class EventHistoryWorkspaceService {
 
     return {
       ...eventHistory,
-      eventMessage: eventHistory.event.message,
+      eventMessage: eventHistory.event?.message,
     };
   }
 

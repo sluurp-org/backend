@@ -1,5 +1,9 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { ContentType, KakaoTemplateStatus } from '@prisma/client';
+import {
+  ContentType,
+  KakaoTemplateStatus,
+  MessageTarget,
+} from '@prisma/client';
 import { Expose, Exclude, Type } from 'class-transformer';
 import { KakaoTemplateButtonType } from '../req/subtemplate/create-kakao-template-body.dto';
 
@@ -236,6 +240,30 @@ export class MessageDto {
     example: '2021-08-31T07:00:00.000Z',
   })
   updatedAt: Date;
+
+  @Expose()
+  @ApiProperty({
+    description: '메세지 수신자 타입',
+    enum: MessageTarget,
+    example: MessageTarget.BUYER,
+  })
+  target: MessageTarget;
+
+  @Expose()
+  @ApiProperty({
+    description: '커스텀 전화번호',
+    example: '01012345678',
+    required: false,
+  })
+  customPhone?: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '커스텀 이메일',
+    example: 'test@test.com',
+    required: false,
+  })
+  customEmail?: string;
 
   @Exclude()
   workspaceId: number;

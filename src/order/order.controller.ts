@@ -134,7 +134,11 @@ export class OrderController {
       orderId,
       dto,
     );
-    const total = await this.orderService.countHistory(workspaceId, orderId);
+    const total = await this.orderService.countHistory(
+      workspaceId,
+      orderId,
+      dto,
+    );
 
     return {
       nodes,

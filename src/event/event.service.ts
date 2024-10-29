@@ -420,21 +420,36 @@ export class EventService {
     if (!availableEvents.length) return;
 
     const variables = await this.prismaService.variables.findMany();
-    const messageBodies = await Promise.allSettled(
-      availableEvents.map(async (eventPayload) => {
-        const updateInput = this.createMessageBody(
-          eventPayload.eventHistory,
-          eventPayload.order,
-          variables,
-        );
 
-        return await this.prismaService.eventHistory.update({
-          where: { id: eventPayload.eventHistory.id },
-          data: {
-            ...updateInput,
-            status: EventStatus.READY,
-          },
-        });
+    const messageBodies = await Promise.all(
+      availableEvents.map(async (eventPayload) => {
+        try {
+          const updateInput = this.createMessageBody(
+            eventPayload.eventHistory,
+            eventPayload.order,
+            variables,
+          );
+
+          const updatedEvent = await this.prismaService.eventHistory.update({
+            where: { id: eventPayload.eventHistory.id },
+            data: {
+              ...updateInput,
+              status: EventStatus.READY,
+            },
+          });
+
+          return {
+            status: 'fulfilled',
+            value: updatedEvent,
+            id: eventPayload.eventHistory.id,
+          };
+        } catch (error) {
+          return {
+            status: 'rejected',
+            reason: error,
+            id: eventPayload.eventHistory.id,
+          };
+        }
       }),
     );
 
@@ -449,6 +464,7 @@ export class EventService {
     const failedMessage = messageBodies.filter(
       (messageBody) => messageBody.status === 'rejected',
     );
+    const failedMessageEventHistoryIds = failedMessage.map((item) => item.id);
 
     if (failedMessage.length) {
       this.logger.error(
@@ -457,6 +473,11 @@ export class EventService {
 
       failedMessage.forEach(({ reason }) => {
         this.logger.error(reason);
+      });
+
+      await this.prismaService.eventHistory.updateMany({
+        where: { id: { in: failedMessageEventHistoryIds } },
+        data: { status: EventStatus.FAILED },
       });
     }
   }

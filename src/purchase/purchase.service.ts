@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -1158,6 +1159,14 @@ export class PurchaseService {
       throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
 
     const { amount } = dto;
+
+    if (amount < 5_000)
+      throw new BadRequestException('충전 금액은 최소 5000원이여야 합니다.');
+
+    if (amount > 100_000)
+      throw new BadRequestException(
+        '충전은 1회당 최대 10만원 까지 가능합니다.',
+      );
 
     return await this.prismaService.purchaseHistory.create({
       data: {

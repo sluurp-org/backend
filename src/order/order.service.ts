@@ -249,13 +249,19 @@ export class OrderService {
     });
   }
 
-  public async countHistory(workspaceId: number, orderId: number) {
+  public async countHistory(
+    workspaceId: number,
+    orderId: number,
+    dto: FindOrderHistoryQueryDto,
+  ) {
+    const { type } = dto;
     return this.prismaService.orderHistory.count({
       where: {
         orderId,
         order: {
           workspaceId,
         },
+        type,
       },
     });
   }

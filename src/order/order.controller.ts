@@ -12,7 +12,7 @@ import { FindOrderQueryDto } from './dto/req/find-order-query.dto';
 import { CreateOrderBodyDto } from './dto/req/create-order-body.dto';
 import { UpdateOrderBodyDto } from './dto/req/update-order-body';
 import { OrderHistoryDto } from './dto/res/order-history.dto';
-import { PaginationQueryDto } from 'src/common/dto/req/pagination-query.dto';
+import { FindOrderHistoryQueryDto } from './dto/req/find-order-history-query.dto';
 
 @ApiTags('order')
 @WorkspaceController('order')
@@ -127,7 +127,7 @@ export class OrderController {
   public async findHistory(
     @ReqWorkspace() { id: workspaceId }: Workspace,
     @Param('orderId') orderId: number,
-    @Query() dto: PaginationQueryDto,
+    @Query() dto: FindOrderHistoryQueryDto,
   ) {
     const nodes = await this.orderService.findHistory(
       workspaceId,

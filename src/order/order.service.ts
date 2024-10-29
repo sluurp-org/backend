@@ -11,10 +11,9 @@ import { CreateOrderBodyDto } from './dto/req/create-order-body.dto';
 import { FindOrdersBatchResponseDto } from './dto/res/find-orders-batch-response.dto';
 import { FindOrderBatchQueryDto } from './dto/req/find-order-batch-query.dto';
 import { UpdateOrderBodyDto } from './dto/req/update-order-body';
-import { PaginationQueryDto } from 'src/common/dto/req/pagination-query.dto';
 import { EventService } from 'src/event/event.service';
 import { randomUUID } from 'crypto';
-import { WorkspaceService } from 'src/workspace/workspace.service';
+import { FindOrderHistoryQueryDto } from './dto/req/find-order-history-query.dto';
 
 @Injectable()
 export class OrderService {
@@ -223,15 +222,16 @@ export class OrderService {
   public async findHistory(
     workspaceId: number,
     orderId: number,
-    dto: PaginationQueryDto,
+    dto: FindOrderHistoryQueryDto,
   ) {
-    const { take, skip } = dto;
+    const { take, skip, type } = dto;
     return this.prismaService.orderHistory.findMany({
       where: {
         orderId,
         order: {
           workspaceId,
         },
+        type,
       },
       include: {
         eventHistory: {

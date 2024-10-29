@@ -422,7 +422,7 @@ export class MessageService {
     const replacedStr = content.replace(regex, (match, p1) => {
       const valueName = variableMap[p1];
       const value = body[valueName];
-      return value !== undefined ? value.toString() : match;
+      return value !== undefined ? value?.toString() : match;
     });
 
     return replacedStr;

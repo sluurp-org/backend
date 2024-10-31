@@ -136,6 +136,16 @@ export class WorkerController {
   }
 
   @ApiOperation({
+    summary: '결제 요청 웹훅',
+    description: '워크스페이스 결제를 요청합니다.',
+  })
+  @Post('purchase/request')
+  @WorkerAuth()
+  public async requestPurchase() {
+    return await this.purchaseService.createPurchase();
+  }
+
+  @ApiOperation({
     summary: '솔라피 카카오 템플릿 상태 변경 웹훅',
     description: '솔라피 카카오 템플릿 상태 변경 웹훅을 처리합니다.',
   })
@@ -165,6 +175,6 @@ export class WorkerController {
   })
   @UseGuards(PortoneGuard)
   public async webhook(@Body() dto: WebhookBodyDto) {
-    return this.purchaseService.portoneWebhook(dto);
+    return this.purchaseService.handlePaymentWebhook(dto);
   }
 }

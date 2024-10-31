@@ -48,6 +48,7 @@
     "ioredis": "^5.4.1",
     "joi": "^17.13.3",
     "nestjs-command": "^3.1.4",
+    "nestjs-telegraf": "^2.8.1",
     "passport": "^0.7.0",
     "passport-http": "^0.3.0",
     "passport-jwt": "^4.0.1",
@@ -55,7 +56,8 @@
     "prisma-json-types-generator": "^3.0.4",
     "reflect-metadata": "^0.2.0",
     "rxjs": "^7.8.1",
-    "solapi": "^5.3.1"
+    "solapi": "^5.3.1",
+    "telegraf": "^4.16.3"
   },
   "devDependencies": {
     "@nestjs/cli": "^10.0.0",

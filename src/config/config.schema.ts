@@ -34,7 +34,8 @@ const validationSchema = Joi.object({
   PORTONE_API_KEY: Joi.string().required(),
   PORTONE_CHANNEL_KEY: Joi.string().required(),
   PORTONE_WEBHOOK_SECRET: Joi.string().required(),
-  FREE_SUBSCRIPTION_DAYS: Joi.number().required(),
+  TELEGRAM_BOT_TOKEN: Joi.string().required(),
+  TELEGRAM_CHAT_ID: Joi.string().required(),
 });
 
 export default validationSchema;

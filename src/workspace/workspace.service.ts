@@ -13,7 +13,6 @@ import { PrismaService } from 'src/prisma/prisma.service';
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
-  private readonly FREE_WORKSPACE_CREDIT = 3000;
 
   constructor(private readonly prismaService: PrismaService) {}
 
@@ -56,9 +55,14 @@ export class WorkspaceService {
   ) {
     try {
       return await this.prismaService.$transaction(async (tx) => {
+        const nextPurchaseAt = new Date();
+        nextPurchaseAt.setMonth(nextPurchaseAt.getMonth() + 1);
+        nextPurchaseAt.setHours(0, 0, 0, 0);
+
         const workspace = await tx.workspace.create({
           data: {
             ...createWorkspaceDto,
+            nextPurchaseAt,
             workspaceUser: {
               create: {
                 user: { connect: { id: userId } },

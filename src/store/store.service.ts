@@ -81,10 +81,23 @@ export class StoreService {
     }
   }
 
+  private async checkStoreCreateAble(workspaceId: number) {
+    const workspaceBilling =
+      await this.prismaService.workspaceBilling.findUnique({
+        where: { workspaceId },
+      });
+
+    if (!workspaceBilling)
+      throw new BadRequestException('결제 카드를 먼저 추가해주세요.');
+
+    return true;
+  }
+
   public async create(
     workspaceId: number,
     createStoreBodyDto: CreateStoreBodyDto,
   ) {
+    await this.checkStoreCreateAble(workspaceId);
     const { type, smartStoreCredentials, ...rest } = createStoreBodyDto;
 
     if (type === StoreType.SMARTSTORE && !smartStoreCredentials)
@@ -365,6 +378,9 @@ export class StoreService {
         type: StoreType.SMARTSTORE,
         smartStoreCredentials: {
           isNot: null,
+        },
+        workspace: {
+          deletedAt: null,
         },
       },
       include: { smartStoreCredentials: true },

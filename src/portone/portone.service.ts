@@ -104,6 +104,7 @@ export class PortoneService {
       ordererName: string;
       amount: number;
     },
+    customData?: string,
   ) {
     const { orderName, ordererId, ordererName, amount } = orderDetail;
 
@@ -120,6 +121,7 @@ export class PortoneService {
               name: { full: ordererName },
             },
             amount: { total: amount },
+            customData,
           },
         ),
       );

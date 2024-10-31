@@ -66,13 +66,14 @@ enum WorkspaceRole {
 }
 
 model Workspace {
-  id     Int    @id @default(autoincrement())
-  name   String
-  credit Int    @default(0)
+  id   Int    @id @default(autoincrement())
+  name String
 
   createdAt DateTime  @default(now())
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
+
+  nextPurchaseAt DateTime?
 
   workspaceUser    WorkspaceUser[]
   store            Store[]
@@ -102,11 +103,6 @@ model WorkspaceBilling {
   purchaseHistory PurchaseHistory[]
 
   @@unique([workspaceId])
-}
-
-enum CreditType {
-  ADD
-  USE
 }
 
 model Store {
@@ -409,7 +405,6 @@ model EventHistory {
   eventId     Int?
   orderId     Int?
   messageId   Int?
-  creditId    Int?
 
   messageContent   String? @db.LongText
   messageVariables Json?
@@ -519,7 +514,10 @@ model PurchaseHistory {
 
   workspaceId Int
 
-  amount      Int?
+  amount         Int? // 결제 금액
+  discountAmount Int? @default(0) // 할인 금액 
+  totalAmount    Int? // 총 결제 금액
+
   reason      String?
   status      PurchaseStatus
   purchasedAt DateTime?
@@ -535,6 +533,16 @@ model PurchaseHistory {
   updatedAt DateTime @default(now()) @updatedAt
 
   @@index([workspaceId])
+}
+
+model Config {
+  id Int @id @default(autoincrement())
+
+  defaultPrice        Int @default(5000)
+  customAlimtalkPrice Int @default(50)
+  alimtalkSendPrice   Int @default(100)
+  emailSendPrice      Int @default(150)
+  contentSendPrice    Int @default(100)
 }
 
 enum PurchaseStatus {

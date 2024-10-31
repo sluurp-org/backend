@@ -22,6 +22,20 @@ export class PurchaseHistoryDto {
 
   @Expose()
   @ApiProperty({
+    example: 10000,
+    description: '할인 금액',
+  })
+  discountAmount: number;
+
+  @Expose()
+  @ApiProperty({
+    example: 10000,
+    description: '총 결제 금액',
+  })
+  totalAmount: number;
+
+  @Expose()
+  @ApiProperty({
     example: '결제 사유',
     description: '결제 사유',
   })
@@ -46,29 +60,15 @@ export class PurchaseHistoryDto {
   updatedAt: Date;
 
   @ApiProperty({
-    example: new Date(),
-    description: '구독 시작일',
-  })
-  @Expose()
-  startedAt: Date;
-
-  @ApiProperty({
-    example: new Date(),
-    description: '구독 종료일',
-  })
-  @Expose()
-  endedAt: Date;
-
-  @ApiProperty({
     example: PurchaseStatus.PAID,
-    description: '구독 상태',
+    description: '결제 상태',
   })
   @Expose()
   status: PurchaseStatus;
 
   @ApiProperty({
     example: new Date(),
-    description: '구독 결제일',
+    description: '결제일',
   })
   @Expose()
   purchasedAt: Date;

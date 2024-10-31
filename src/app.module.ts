@@ -5,7 +5,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-
+import { TelegrafModule } from 'nestjs-telegraf';
 import { WorkspaceMiddleware } from './workspace/middleware/workspace.middleware';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ProductModule } from './product/product.module';
@@ -33,6 +33,7 @@ import { PortoneModule } from './portone/portone.module';
 import { MailModule } from './mail/mail.module';
 import { EventHistoryModule } from './event-history/event-history.module';
 import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
+import { TelegramModule } from './telegram/telegram.module';
 
 @Module({
   imports: [
@@ -59,6 +60,13 @@ import { EventHistoryWorkspaceModule } from './event-history-workspace/event-his
         ],
       }),
     }),
+    TelegrafModule.forRootAsync({
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: async (configService: ConfigService) => ({
+        token: configService.get('TELEGRAM_BOT_TOKEN'),
+      }),
+    }),
     KakaoModule,
     WorkspaceModule,
     UsersModule,
@@ -78,6 +86,7 @@ import { EventHistoryWorkspaceModule } from './event-history-workspace/event-his
     MailModule,
     EventHistoryModule,
     EventHistoryWorkspaceModule,
+    TelegramModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

@@ -9,12 +9,7 @@ import { UpdateContentGroupBodyDto } from './dto/req/update-content-group-body.d
 import { FindContentGroupQueryDto } from './dto/req/find-content-group-query.dto';
 import { FindContentQueryDto } from './dto/req/find-content-query.dto copy';
 import { CreateContentBodyDto } from './dto/req/create-content-body.dto';
-import {
-  ContentStatus,
-  ContentType,
-  Prisma,
-  SubscriptionModel,
-} from '@prisma/client';
+import { ContentStatus, ContentType, Prisma } from '@prisma/client';
 import { isNumber, isURL } from 'class-validator';
 import { UpdateContentBodyDto } from './dto/req/update-content-body.dto.ts';
 import { CreateContentFileBodyDto } from './dto/req/create-content-file-body.dto';
@@ -60,10 +55,7 @@ export class ContentService {
   public async createGroup(
     workspaceId: number,
     data: CreateContentGroupBodyDto,
-    workspaceSubscription?: SubscriptionModel,
   ) {
-    await this.checkContentLimit(workspaceId, workspaceSubscription);
-
     return this.prismaService.contentGroup.create({
       data: { ...data, workspaceId },
     });
@@ -168,33 +160,6 @@ export class ContentService {
     if (!content) throw new NotFoundException('컨텐츠를 찾을 수 없습니다.');
 
     return content;
-  }
-
-  private async checkContentLimit(
-    workspaceId: number,
-    workspaceSubscription?: SubscriptionModel,
-  ) {
-    if (!workspaceSubscription)
-      throw new BadRequestException(
-        '컨텐츠를 생성하기 위해 먼저 워크스페이스 구독이 필요합니다.',
-      );
-
-    if (!workspaceSubscription.isContentEnabled) {
-      throw new BadRequestException(
-        '컨텐츠 기능이 비활성화되었습니다. 상위 플랜이 필요합니다.',
-      );
-    }
-
-    const { contentLimit } = workspaceSubscription;
-    const contentGroupCount = await this.prismaService.contentGroup.count({
-      where: { workspaceId },
-    });
-
-    if (contentLimit !== 0 && contentGroupCount >= contentLimit) {
-      throw new BadRequestException(
-        `컨텐츠 생성 가능 개수를 초과하였습니다. 최대 ${contentLimit}개까지 생성 가능합니다.`,
-      );
-    }
   }
 
   public async createContent(

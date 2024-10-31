@@ -19,7 +19,6 @@ import { ConnectChannelBodyDto } from './dto/req/connect-channel-body.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import sizeOf from 'image-size';
-import { SubscriptionModel } from '@prisma/client';
 
 @Injectable()
 export class KakaoService {
@@ -140,16 +139,7 @@ export class KakaoService {
   public async connectKakaoChannel(
     workspaceId: number,
     dto: ConnectChannelBodyDto,
-    workspaceSubscription?: SubscriptionModel,
   ) {
-    if (!workspaceSubscription)
-      throw new BadRequestException('워크스페이스 구독이 필요합니다.');
-
-    if (!workspaceSubscription.isCustomKakaoEnabled)
-      throw new BadRequestException(
-        '카카오 채널 연동 기능이 비활성화되었습니다. 상위 플랜이 필요합니다.',
-      );
-
     const kakaoCredential = await this.prismaService.kakaoCredential.findUnique(
       { where: { workspaceId } },
     );

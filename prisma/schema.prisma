@@ -41,8 +41,6 @@ enum Provider {
 model InternalMailTemplate {
   id Int @id @default(autoincrement())
 
-  // mail
-
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 }
@@ -76,11 +74,6 @@ model Workspace {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  subscriptionId      Int?
-  subscriptionEndedAt DateTime?
-
-  subscription SubscriptionModel? @relation(fields: [subscriptionId], references: [id])
-
   workspaceUser    WorkspaceUser[]
   store            Store[]
   product          Product[]
@@ -91,7 +84,6 @@ model Workspace {
   messageTemplate  MessageTemplate[]
   orderHistory     OrderHistory[]
   contentGroup     ContentGroup[]
-  workspaceCredit  WorkspaceCredit[]
   purchaseHistory  PurchaseHistory[]
   workspaceBilling WorkspaceBilling?
   eventHistory     EventHistory[]
@@ -110,24 +102,6 @@ model WorkspaceBilling {
   purchaseHistory PurchaseHistory[]
 
   @@unique([workspaceId])
-}
-
-model WorkspaceCredit {
-  id           Int        @id @default(autoincrement())
-  workspaceId  Int
-  amount       Int        @default(0)
-  remainAmount Int        @default(0)
-  type         CreditType @default(ADD)
-  reason       String?
-  expireAt     DateTime?
-
-  workspace Workspace? @relation(fields: [workspaceId], references: [id])
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  deletedAt       DateTime?
-  purchaseHistory PurchaseHistory[]
-  eventHistory    EventHistory[]
 }
 
 enum CreditType {
@@ -451,7 +425,6 @@ model EventHistory {
   updatedAt DateTime @default(now()) @updatedAt
 
   workspace       Workspace                       @relation(fields: [workspaceId], references: [id])
-  credit          WorkspaceCredit?                @relation(fields: [creditId], references: [id])
   event           Event?                          @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   order           Order?                          @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
   messageTemplate MessageTemplate?                @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
@@ -541,31 +514,6 @@ model Variables {
   updatedAt DateTime @default(now()) @updatedAt
 }
 
-model SubscriptionModel {
-  id Int @id @default(autoincrement())
-
-  name        String
-  description String?
-  price       Int
-
-  isContentEnabled     Boolean @default(false)
-  isMessageEnabled     Boolean @default(false)
-  isCustomKakaoEnabled Boolean @default(false)
-
-  contentLimit Int @default(0)
-  messageLimit Int @default(0)
-  storeLimit   Int @default(1)
-
-  contentCredit  Int @default(30)
-  alimTalkCredit Int @default(20)
-  emailCredit    Int @default(40)
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  PurchaseHistory PurchaseHistory[]
-  Workspace       Workspace[]
-}
-
 model PurchaseHistory {
   id String @id @default(uuid())
 
@@ -573,34 +521,20 @@ model PurchaseHistory {
 
   amount      Int?
   reason      String?
-  type        PurchaseType
   status      PurchaseStatus
   purchasedAt DateTime?
+  retry       Int            @default(0)
 
-  billingId      Int?
-  creditId       Int?
-  subscriptionId Int?
-  scheduledId    String?
+  billingId   Int?
+  scheduledId String?
 
-  startedAt DateTime?
-  endedAt   DateTime?
-
-  workspace    Workspace          @relation(fields: [workspaceId], references: [id])
-  credit       WorkspaceCredit?   @relation(fields: [creditId], references: [id])
-  subscription SubscriptionModel? @relation(fields: [subscriptionId], references: [id])
-  billing      WorkspaceBilling?  @relation(fields: [billingId], references: [id])
+  workspace Workspace         @relation(fields: [workspaceId], references: [id])
+  billing   WorkspaceBilling? @relation(fields: [billingId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
   @@index([workspaceId])
-  @@index([subscriptionId])
-}
-
-enum PurchaseType {
-  CREDIT
-  SUBSCRIPTION
-  CHANGE_SUBSCRIPTION
 }
 
 enum PurchaseStatus {

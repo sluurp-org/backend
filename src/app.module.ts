@@ -33,7 +33,6 @@ import { PortoneModule } from './portone/portone.module';
 import { MailModule } from './mail/mail.module';
 import { EventHistoryModule } from './event-history/event-history.module';
 import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
-import { SubscriptionModule } from './subscription/subscription.module';
 
 @Module({
   imports: [
@@ -79,7 +78,6 @@ import { SubscriptionModule } from './subscription/subscription.module';
     MailModule,
     EventHistoryModule,
     EventHistoryWorkspaceModule,
-    SubscriptionModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

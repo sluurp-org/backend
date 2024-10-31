@@ -1,7 +1,6 @@
-import { ApiProperty } from "@nestjs/swagger";
-import { PurchaseStatus, PurchaseType } from "@prisma/client";
-import { Exclude, Expose, Type } from "class-transformer";
-import { GetSubscriptionProductsResponseDto } from "src/subscription/dto/res/subscription.dto";
+import { ApiProperty } from '@nestjs/swagger';
+import { PurchaseStatus } from '@prisma/client';
+import { Exclude, Expose } from 'class-transformer';
 
 export class PurchaseHistoryDto {
   @ApiProperty({
@@ -27,13 +26,6 @@ export class PurchaseHistoryDto {
     description: '결제 사유',
   })
   reason: string;
-
-  @Expose()
-  @ApiProperty({
-    example: PurchaseType.CREDIT,
-    description: '결제 유형',
-  })
-  type: PurchaseType;
 
   @Exclude()
   billingId: number;

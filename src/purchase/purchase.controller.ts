@@ -1,4 +1,4 @@
-import { Body, Delete, Get, Patch, Post, Query } from '@nestjs/common';
+import { Body, Get, Post, Query } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
 import { Workspace, WorkspaceRole } from '@prisma/client';
@@ -11,20 +11,12 @@ import {
   ApiResponse,
   ApiTags,
 } from '@nestjs/swagger';
-import { CreatePurchaseBodyDto } from './dto/req/create-purchase-body.dto';
 
 import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { BillingDto } from './dto/res/billing.dto';
 import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
-import { CreateCreditPurchaseOrderBodyDto } from './dto/req/create-credit-purchase-order-body.dto';
-import { CompletePurchaseBodyDto } from './dto/req/completed-purchase-body.dto';
-import {
-  SubscriptionResponseDto,
-  WorkspaceSubscriptionResponseDto,
-} from './dto/res/subscription.dto';
 import { PurchaseHistoryDto } from './dto/res/purchase-history';
 import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
-import { AdditionalPaymentQueryDto } from './dto/req/additional-payment-query.dto';
 
 @ApiTags('Purchase')
 @WorkspaceController('purchase')
@@ -75,116 +67,12 @@ export class PurchaseController {
     @ReqWorkspace() { id: workspaceId }: Workspace,
     @Query() query: PurchaseHistoryQueryDto,
   ) {
-    const total = await this.purchaseService.countPurchaseHistory(
-      workspaceId,
-      query,
-    );
-    const nodes = await this.purchaseService.getPurchaseHistory(
+    const total = await this.purchaseService.countPurchaseHistory(workspaceId);
+    const nodes = await this.purchaseService.findPurchaseHistory(
       workspaceId,
       query,
     );
 
     return { nodes, total };
-  }
-
-  @Get()
-  @ApiOperation({
-    summary: '구독 정보 조회',
-    description: '워크스페이스의 구독 정보를 조회합니다.',
-  })
-  @Serialize(WorkspaceSubscriptionResponseDto)
-  @ApiOkResponse({
-    type: WorkspaceSubscriptionResponseDto,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async subscription(@ReqWorkspace() { id: workspaceId }: Workspace) {
-    return this.purchaseService.getSubscription(workspaceId);
-  }
-
-  @Post()
-  @ApiOperation({
-    summary: '구독 정보 생성',
-    description: '워크스페이스의 구독 정보를 생성합니다.',
-  })
-  @Serialize(SubscriptionResponseDto)
-  @ApiResponse({
-    status: 200,
-    type: SubscriptionResponseDto,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async createSubscription(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Body() { subscriptionId }: CreatePurchaseBodyDto,
-  ) {
-    return this.purchaseService.createSubscription(workspaceId, subscriptionId);
-  }
-
-  @Patch()
-  @ApiOperation({
-    summary: '구독 정보 수정',
-    description: '워크스페이스의 구독 정보를 수정합니다.',
-  })
-  @Serialize(SubscriptionResponseDto)
-  @ApiResponse({
-    status: 200,
-    type: SubscriptionResponseDto,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async updateSubscription(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Body() { subscriptionId }: CreatePurchaseBodyDto,
-  ) {
-    return this.purchaseService.updateSubscription(workspaceId, subscriptionId);
-  }
-
-  @Delete()
-  @ApiOperation({
-    summary: '구독 정보 삭제',
-    description: '워크스페이스의 구독 정보를 삭제합니다.',
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  @Serialize(SubscriptionResponseDto)
-  @ApiResponse({
-    status: 200,
-    type: SubscriptionResponseDto,
-  })
-  public async deleteSubscription(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-  ) {
-    return this.purchaseService.cancelSubscription(workspaceId);
-  }
-
-  @Get('additional-payment')
-  @ApiOperation({
-    summary: '추가 결제 금액 조회',
-    description: '워크스페이스의 추가 결제 금액을 조회합니다.',
-  })
-  @ApiResponse({
-    status: 200,
-    type: Number,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async additionalPayment(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Query() { subscriptionId }: AdditionalPaymentQueryDto,
-  ) {
-    return this.purchaseService.calculateWorkspaceAdditionalPayment(
-      workspaceId,
-      subscriptionId,
-    );
-  }
-
-  @Get('able-free-trial')
-  @ApiOperation({
-    summary: '무료 체험 가능 여부 조회',
-    description: '워크스페이스의 무료 체험 가능 여부를 조회합니다.',
-  })
-  @ApiResponse({
-    status: 200,
-    type: Boolean,
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async ableFreeTrial(@ReqWorkspace() { id: workspaceId }: Workspace) {
-    return !(await this.purchaseService.isNotAvailableFreeTrial(workspaceId));
   }
 }

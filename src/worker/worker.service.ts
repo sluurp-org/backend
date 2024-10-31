@@ -32,10 +32,6 @@ export class WorkerService {
     private readonly purchaseService: PurchaseService,
   ) {}
 
-  public async sendPurchaseCronJob() {
-    return this.purchaseService.expiredWorkspaces();
-  }
-
   public async findOrdersByBatchQuery(
     dto: FindOrderBatchQueryDto,
   ): Promise<Order[]> {
@@ -142,7 +138,6 @@ export class WorkerService {
                   },
                 },
               },
-              credit: true,
               event: {
                 include: {
                   message: true,

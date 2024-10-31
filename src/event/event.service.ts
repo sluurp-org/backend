@@ -159,32 +159,14 @@ export class EventService {
   ): Promise<
     Pick<
       Prisma.EventHistoryCreateInput,
-      | 'event'
-      | 'order'
-      | 'credit'
-      | 'contents'
-      | 'status'
-      | 'message'
-      | 'messageTemplate'
+      'event' | 'order' | 'contents' | 'status' | 'message' | 'messageTemplate'
     >
   > {
-    const { id: orderId, receiverPhone, workspaceId, quantity } = order;
+    const { id: orderId, receiverPhone, quantity } = order;
     const {
       id: eventId,
       message: { id: messageId, contentGroup },
     } = event;
-
-    const workspaceSubscription =
-      await this.workspaceService.findWorkspaceSubscription(workspaceId);
-
-    if (!workspaceSubscription) {
-      return {
-        event: { connect: { id: eventId } },
-        order: { connect: { id: orderId } },
-        status: EventStatus.FAILED,
-        message: '워크스페이스 구독 정보를 찾을 수 없습니다.',
-      };
-    }
 
     if (contentGroup) {
       try {

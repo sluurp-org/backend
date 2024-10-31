@@ -136,16 +136,6 @@ export class WorkerController {
   }
 
   @ApiOperation({
-    summary: '결제 크론 웹훅',
-    description: '만료된 결제를 처리합니다.',
-  })
-  @Post('purchase/cron')
-  @WorkerAuth()
-  public async sendPurchaseCronJob() {
-    return await this.workerService.sendPurchaseCronJob();
-  }
-
-  @ApiOperation({
     summary: '솔라피 카카오 템플릿 상태 변경 웹훅',
     description: '솔라피 카카오 템플릿 상태 변경 웹훅을 처리합니다.',
   })
@@ -175,6 +165,6 @@ export class WorkerController {
   })
   @UseGuards(PortoneGuard)
   public async webhook(@Body() dto: WebhookBodyDto) {
-    return this.purchaseService.webhook(dto);
+    return this.purchaseService.portoneWebhook(dto);
   }
 }

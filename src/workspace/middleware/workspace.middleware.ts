@@ -26,7 +26,6 @@ export class WorkspaceMiddleware implements NestMiddleware {
     }
 
     req.workspace = workspace;
-    req.subscription = workspace.subscription;
     return next();
   }
 }

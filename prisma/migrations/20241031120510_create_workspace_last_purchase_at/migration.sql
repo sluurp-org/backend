@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Workspace` ADD COLUMN `lastPurchaseAt` DATETIME(3) NULL DEFAULT CURRENT_TIMESTAMP(3);

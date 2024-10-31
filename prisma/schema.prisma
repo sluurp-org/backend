@@ -73,6 +73,7 @@ model Workspace {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
+  lastPurchaseAt DateTime? @default(now())
   nextPurchaseAt DateTime?
 
   workspaceUser    WorkspaceUser[]

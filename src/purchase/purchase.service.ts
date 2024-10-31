@@ -132,12 +132,16 @@ export class PurchaseService {
 
       await this.prismaService.workspace.update({
         where: { id: workspace.id },
-        data: { nextPurchaseAt },
+        data: { nextPurchaseAt, lastPurchaseAt: new Date() },
       });
 
       await this.prismaService.$transaction(async (transaction) => {
         const eventHistories = await transaction.eventHistory.findMany({
-          where: { workspaceId: workspace.id, status: EventStatus.SUCCESS },
+          where: {
+            workspaceId: workspace.id,
+            status: EventStatus.SUCCESS,
+            processedAt: { gte: workspace.lastPurchaseAt, lt: nextPurchaseAt },
+          },
           include: { messageTemplate: true },
         });
 

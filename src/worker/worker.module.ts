@@ -5,7 +5,6 @@ import { OrderModule } from 'src/order/order.module';
 import { SmartstoreModule } from 'src/smartstore/smartstore.module';
 import { StoreModule } from 'src/store/store.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
-import { CreditModule } from 'src/credit/credit.module';
 import { PurchaseModule } from 'src/purchase/purchase.module';
 
 @Module({
@@ -15,7 +14,6 @@ import { PurchaseModule } from 'src/purchase/purchase.module';
     OrderModule,
     StoreModule,
     PrismaModule,
-    CreditModule,
     PurchaseModule,
   ],
   controllers: [WorkerController],

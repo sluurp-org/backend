@@ -1,6 +1,6 @@
 import { Workspace, WorkspaceRole } from '@prisma/client';
 import { ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
-import { Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Get, Param, Patch, Post, Query } from '@nestjs/common';
 
 import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
@@ -14,6 +14,7 @@ import { FindProductQueryDto } from './dto/req/find-product-query.dto';
 import { ProductVariantDto } from './dto/res/product-variant.dto';
 import { StoreService } from 'src/store/store.service';
 import { FindProductOptionQueryDto } from './dto/req/find-product-option-query.dto';
+import { UpdateProductBodyDto } from './dto/req/update-product-body.dto';
 
 @ApiTags('product')
 @WorkspaceController('product')
@@ -64,6 +65,21 @@ export class ProductController {
     return plainToInstance(ProductDto, product, {
       excludeExtraneousValues: true,
     });
+  }
+
+  @ApiOperation({
+    summary: '상품 수정',
+    description: '워크스페이스의 상품를 수정 합니다.',
+  })
+  @Patch(':productId')
+  @Serialize(ProductDto)
+  @WorkspaceAuth([WorkspaceRole.OWNER, WorkspaceRole.MEMBER])
+  async update(
+    @ReqWorkspace() { id: workspaceId }: Workspace,
+    @Param('productId') productId: number,
+    @Body() dto: UpdateProductBodyDto,
+  ) {
+    return this.productService.update(workspaceId, productId, dto);
   }
 
   @ApiOperation({

@@ -7,7 +7,6 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { CreditService } from 'src/credit/credit.service';
 import { PortoneService } from 'src/portone/portone.service';
 import {
   Prisma,
@@ -35,7 +34,6 @@ export class PurchaseService {
 
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly creditService: CreditService,
     private readonly portoneService: PortoneService,
   ) {}
 
@@ -1206,22 +1204,11 @@ export class PurchaseService {
         throw new NotAcceptableException('이미 결제 완료된 주문입니다.');
 
       if (paymentResult.status === PurchaseStatus.PAID) {
-        const credit = await this.creditService.create(
-          purchase.workspaceId,
-          {
-            amount: purchase.amount,
-            reason: purchase.reason,
-            expireAfterDays: this.EXPIRE_AFTER_DAYS,
-          },
-          transaction,
-        );
-
         return await transaction.purchaseHistory.update({
           where: { id: paymentId },
           data: {
             status: PurchaseStatus.PAID,
             purchasedAt: new Date(),
-            creditId: credit.id,
           },
         });
       }

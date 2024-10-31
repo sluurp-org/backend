@@ -12,7 +12,6 @@ import {
   Variables,
 } from '@prisma/client';
 import { MessageService } from 'src/message/message.service';
-import { CreditService } from 'src/credit/credit.service';
 import { ContentService } from 'src/content/content.service';
 import { WorkspaceService } from 'src/workspace/workspace.service';
 import { format } from 'date-fns';
@@ -25,7 +24,6 @@ export class EventService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly messageService: MessageService,
-    private readonly creditService: CreditService,
     private readonly contentService: ContentService,
     private readonly workspaceService: WorkspaceService,
   ) {}
@@ -188,8 +186,6 @@ export class EventService {
       };
     }
 
-    const { contentCredit, alimTalkCredit } = workspaceSubscription;
-
     if (contentGroup) {
       try {
         const { id: contentGroupId, expireMinute, oneTime } = contentGroup;
@@ -207,11 +203,6 @@ export class EventService {
           );
         }
 
-        const usedCredit = await this.creditService.use(workspaceId, {
-          amount: contentCredit + alimTalkCredit,
-          reason: '콘텐츠 메세지 발송 (알림톡 + 콘텐츠)',
-        });
-
         const expireAt = new Date();
         expireAt.setMinutes(expireAt.getMinutes() + expireMinute);
 
@@ -219,7 +210,6 @@ export class EventService {
           messageTemplate: { connect: { id: messageId } },
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
-          credit: { connect: { id: usedCredit.id } },
           contents: {
             createMany: {
               data: contents.map(({ id, contentGroup }) => ({
@@ -250,16 +240,10 @@ export class EventService {
       };
 
     try {
-      const usedCredit = await this.creditService.use(workspaceId, {
-        amount: alimTalkCredit,
-        reason: '알림톡 메세지 발송',
-      });
-
       return {
         messageTemplate: { connect: { id: messageId } },
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
-        credit: { connect: { id: usedCredit.id } },
         status: EventStatus.CONTENT_READY,
       };
     } catch (error) {

@@ -18,7 +18,6 @@ import { StoreService } from 'src/store/store.service';
 import { KakaoTemplateStatusBodyDto } from './dto/req/kakao-template-status-body.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.dto';
-import { CreditService } from 'src/credit/credit.service';
 import { PurchaseService } from 'src/purchase/purchase.service';
 
 @Injectable()
@@ -30,7 +29,6 @@ export class WorkerService {
     private readonly smartstoreService: SmartstoreService,
     private readonly storeService: StoreService,
     private readonly prismaService: PrismaService,
-    private readonly creditService: CreditService,
     private readonly purchaseService: PurchaseService,
   ) {}
 
@@ -173,17 +171,6 @@ export class WorkerService {
               isUpdateDelivery: event.event.message.completeDelivery,
               updatedEventHistory,
             };
-          }
-
-          if (event.credit) {
-            await this.creditService.create(
-              event.order.workspaceId,
-              {
-                amount: event.credit.amount,
-                reason: '메세지 미발송건 환불',
-              },
-              tx,
-            );
           }
 
           if (event.contents) {

@@ -2,6 +2,7 @@ import { Injectable, NotFoundException } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { FindProductQueryDto } from './dto/req/find-product-query.dto';
 import { FindProductOptionQueryDto } from './dto/req/find-product-option-query.dto';
+import { UpdateProductBodyDto } from './dto/req/update-product-body.dto';
 
 @Injectable()
 export class ProductService {
@@ -96,6 +97,26 @@ export class ProductService {
       orderBy: { id: 'desc' },
       take,
       skip,
+    });
+  }
+
+  public async update(
+    workspaceId: number,
+    productId: number,
+    dto: UpdateProductBodyDto,
+  ) {
+    const product = await this.prismaService.product.findUnique({
+      where: {
+        id: productId,
+        workspaceId,
+        deletedAt: null,
+      },
+    });
+    if (!product) throw new NotFoundException('상품을 찾을 수 없습니다.');
+
+    return this.prismaService.product.update({
+      where: { id: productId },
+      data: dto,
     });
   }
 

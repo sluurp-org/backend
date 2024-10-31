@@ -1,6 +1,12 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderStatus } from '@prisma/client';
-import { IsEnum, IsNotEmpty, IsNumber, IsOptional } from 'class-validator';
+import {
+  IsEnum,
+  IsNotEmpty,
+  IsNumber,
+  IsOptional,
+  ValidateIf,
+} from 'class-validator';
 
 export class CreateEventBodyDto {
   @ApiProperty({
@@ -8,8 +14,9 @@ export class CreateEventBodyDto {
     example: 1,
   })
   @IsNumber()
+  @ValidateIf((dto) => dto.productVariantId)
   @IsNotEmpty()
-  productId: number;
+  productId?: number;
 
   @ApiProperty({
     description: '상품 옵션 ID',

@@ -24,7 +24,6 @@ import { WorkerModule } from './worker/worker.module';
 import { CommandModule } from 'nestjs-command';
 import { IsBcryptHashConstraint } from './common/validator/hash.validator';
 import { NaverModule } from './naver/naver.module';
-import { CreditModule } from './credit/credit.module';
 import { IsVariableConstraint } from './common/validator/variable.validator';
 import { EventModule } from './event/event.module';
 import { SqsModule } from '@ssut/nestjs-sqs';
@@ -73,7 +72,6 @@ import { SubscriptionModule } from './subscription/subscription.module';
     WorkerModule,
     CommandModule,
     NaverModule,
-    CreditModule,
     EventModule,
     PurchaseModule,
     AwsModule,

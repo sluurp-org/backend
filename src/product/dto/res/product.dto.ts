@@ -48,6 +48,13 @@ export class ProductDto {
   @Type(() => StoreDto)
   store: StoreDto;
 
+  @ApiProperty({
+    description: '글로벌 이벤트 비활성화 여부',
+    example: false,
+  })
+  @Expose()
+  disableGlobalEvent: boolean;
+
   @Exclude()
   storeId: number;
 

@@ -232,7 +232,7 @@ export class StoreService {
 
     if (
       store.lastProductSyncAt &&
-      isSameHour(store.lastProductSyncAt, new Date())
+      differenceInMinutes(new Date(), store.lastProductSyncAt) < 10
     ) {
       const leftMinutes = differenceInMinutes(
         new Date(),

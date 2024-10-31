@@ -1145,82 +1145,6 @@ export class PurchaseService {
     });
   }
 
-  // 크레딧 결제 주문 생성
-  public async createCreditPurchaseOrder(
-    workspaceId: number,
-    dto: CreateCreditPurchaseOrderBodyDto,
-  ) {
-    const workspace = await this.prismaService.workspace.findUnique({
-      where: { id: workspaceId, deletedAt: null },
-    });
-    if (!workspace)
-      throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
-
-    const { amount } = dto;
-
-    if (amount < 5_000)
-      throw new BadRequestException('충전 금액은 최소 5000원이여야 합니다.');
-
-    if (amount > 100_000)
-      throw new BadRequestException(
-        '충전은 1회당 최대 10만원 까지 가능합니다.',
-      );
-
-    return await this.prismaService.purchaseHistory.create({
-      data: {
-        workspaceId,
-        amount,
-        reason: '스르륵 크레딧 결제',
-        type: PurchaseType.CREDIT,
-        status: PurchaseStatus.READY,
-      },
-    });
-  }
-
-  // 크레딧 결제 완료
-  public async completeCreditPurchase(paymentId: string) {
-    const paymentResult = await this.portoneService.getPayment(paymentId);
-    if (!paymentResult)
-      throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
-
-    await this.prismaService.$transaction(async (transaction) => {
-      const purchase = await transaction.purchaseHistory.findUnique({
-        where: { id: paymentId },
-      });
-      if (!purchase)
-        throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
-
-      if (purchase.amount !== paymentResult.amount.total)
-        throw new NotAcceptableException('결제 금액이 일치하지 않습니다.');
-
-      if (purchase.type !== PurchaseType.CREDIT)
-        throw new NotAcceptableException('크레딧 결제가 아닙니다.');
-
-      if (
-        (purchase.status === PurchaseStatus.PAID &&
-          paymentResult.status === PurchaseStatus.PAID) ||
-        purchase.creditId
-      )
-        throw new NotAcceptableException('이미 결제 완료된 주문입니다.');
-
-      if (paymentResult.status === PurchaseStatus.PAID) {
-        return await transaction.purchaseHistory.update({
-          where: { id: paymentId },
-          data: {
-            status: PurchaseStatus.PAID,
-            purchasedAt: new Date(),
-          },
-        });
-      }
-
-      return await transaction.purchaseHistory.update({
-        where: { id: paymentId },
-        data: { status: paymentResult.status },
-        include: { subscription: true },
-      });
-    });
-  }
-
   // 결제 정보 삭제
   private async handleWebhookBillingKeyDeleted(billingKey: string) {
     const billing = await this.prismaService.workspaceBilling.findUnique({
@@ -1249,8 +1173,8 @@ export class PurchaseService {
     });
     if (!purchase) throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
 
-    if (purchase.type === PurchaseType.CREDIT)
-      return this.completeCreditPurchase(paymentId);
+    // if (purchase.type === PurchaseType.CREDIT)
+    // return this.completeCreditPurchase(paymentId);
   }
 
   // 결제 실패

@@ -63,21 +63,6 @@ export class PurchaseController {
     return this.purchaseService.upsertBilling(workspaceId, dto);
   }
 
-  @Post('order/credit')
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async orderCredit(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Body() dto: CreateCreditPurchaseOrderBodyDto,
-  ) {
-    return this.purchaseService.createCreditPurchaseOrder(workspaceId, dto);
-  }
-
-  @Post('order/completed')
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async orderCompleted(@Body() { paymentId }: CompletePurchaseBodyDto) {
-    return this.purchaseService.completeCreditPurchase(paymentId);
-  }
-
   @Get('history')
   @ApiOperation({
     summary: '결제 이력 조회',

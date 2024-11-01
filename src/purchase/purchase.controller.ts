@@ -1,93 +1,25 @@
-import { Body, Get, Post, Query } from '@nestjs/common';
+import { Controller, Get } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
-import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
-import { Workspace, WorkspaceRole } from '@prisma/client';
-import { ReqWorkspace } from 'src/common/decorators/req-workspace.decorator';
-import { WorkspaceController } from 'src/common/decorators/workspace-controller.decorator';
-import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
-import {
-  ApiOkResponse,
-  ApiOperation,
-  ApiResponse,
-  ApiTags,
-} from '@nestjs/swagger';
+import { ApiOkResponse, ApiOperation, ApiTags } from '@nestjs/swagger';
 
 import { Serialize } from 'src/common/decorators/serialize.decorator';
-import { BillingDto } from './dto/res/billing.dto';
-import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
-import { PurchaseHistoryDto } from './dto/res/purchase-history.dto';
-import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
-import { PurchaseDto } from './dto/res/purchase.dto';
+import { PurchaseConfigDto } from './dto/res/purchase-config.dto';
 
 @ApiTags('Purchase')
-@WorkspaceController('purchase')
+@Controller('purchase')
 export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
 
-  @Get()
+  @Get('config')
   @ApiOperation({
-    summary: '결제 정보 조회',
-    description: '워크스페이스의 결제 정보를 조회합니다.',
+    summary: '결제 설정 조회',
+    description: '결제 설정을 조회합니다.',
   })
-  @Serialize(PurchaseDto)
+  @Serialize(PurchaseConfigDto)
   @ApiOkResponse({
-    type: PurchaseDto,
+    type: PurchaseConfigDto,
   })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async getPUrchase(@ReqWorkspace() { id: workspaceId }: Workspace) {
-    return this.purchaseService.getPurchase(workspaceId);
-  }
-
-  @Get('billing')
-  @ApiOperation({
-    summary: '빌링키 조회',
-    description: '워크스페이스의 빌링키를 조회합니다.',
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  @Serialize(BillingDto)
-  @ApiOkResponse({
-    type: BillingDto,
-  })
-  public async getBilling(@ReqWorkspace() { id: workspaceId }: Workspace) {
-    return this.purchaseService.findBilling(workspaceId);
-  }
-
-  @Post('billing')
-  @ApiOperation({
-    summary: '빌링키 생성',
-    description: '워크스페이스의 빌링키를 생성합니다.',
-  })
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  @Serialize(BillingDto)
-  @ApiResponse({
-    status: 200,
-    type: BillingDto,
-  })
-  public async billing(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Body() dto: CreateBillingBodyDto,
-  ) {
-    return this.purchaseService.upsertBilling(workspaceId, dto);
-  }
-
-  @Get('history')
-  @ApiOperation({
-    summary: '결제 이력 조회',
-    description: '워크스페이스의 결제 이력을 조회합니다.',
-  })
-  @Serialize(PurchaseHistoryDto, true)
-  @ApiOkResponsePaginated(PurchaseHistoryDto)
-  @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async history(
-    @ReqWorkspace() { id: workspaceId }: Workspace,
-    @Query() query: PurchaseHistoryQueryDto,
-  ) {
-    const total = await this.purchaseService.countPurchaseHistory(workspaceId);
-    const nodes = await this.purchaseService.findPurchaseHistory(
-      workspaceId,
-      query,
-    );
-
-    return { nodes, total };
+  public async getConfig() {
+    return this.purchaseService.getConfig();
   }
 }

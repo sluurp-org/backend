@@ -25,6 +25,12 @@ export class PurchaseService {
     private readonly telegramService: TelegramService,
   ) {}
 
+  public async getConfig() {
+    return this.prismaService.config.findUnique({
+      where: { id: 1 },
+    });
+  }
+
   public async getPurchase(workspaceId: number) {
     const workspace = await this.prismaService.workspace.findUnique({
       where: { id: workspaceId },

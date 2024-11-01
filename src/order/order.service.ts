@@ -357,14 +357,19 @@ export class OrderService {
       where: {
         workspaceId,
         type,
-        product: { id: productId, deletedAt: null },
         OR: [
           {
+            product: { id: productId, deletedAt: null },
+          },
+          {
+            product: { id: productId, deletedAt: null },
             productVariant: productVariantId
-              ? { id: productVariantId, deletedAt: null }
+              ? {
+                  id: productVariantId,
+                  deletedAt: null,
+                }
               : null,
           },
-          { productVariant: null },
           !disableGlobalEvent && { productVariant: null, product: null },
         ],
         message: {

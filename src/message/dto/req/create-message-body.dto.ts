@@ -14,24 +14,6 @@ import { Type } from 'class-transformer';
 import { CreateKakaoTemplateBodyDto } from './subtemplate/create-kakao-template-body.dto';
 import { MessageTarget } from '@prisma/client';
 
-export class CreateVariableBodyDto {
-  @ApiProperty({
-    description: '변수 이름',
-    example: 'name',
-  })
-  @IsString()
-  @IsNotEmpty()
-  key: string;
-
-  @ApiProperty({
-    description: '변수 값',
-    example: '홍길동',
-  })
-  @IsString()
-  @IsNotEmpty()
-  value: string;
-}
-
 export class CreateMessageBodyDto {
   @ApiProperty({
     description: '메시지 템플릿 이름',
@@ -66,16 +48,6 @@ export class CreateMessageBodyDto {
   @Type(() => CreateKakaoTemplateBodyDto)
   @ValidateNested()
   kakaoTemplate?: CreateKakaoTemplateBodyDto;
-
-  @ApiProperty({
-    description: '변수 목록',
-    type: CreateVariableBodyDto,
-    isArray: true,
-  })
-  @IsOptional()
-  @Type(() => CreateVariableBodyDto)
-  @ValidateNested({ each: true })
-  variables: CreateVariableBodyDto[];
 
   @ApiProperty({
     description: '수신자 타입',

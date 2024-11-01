@@ -4,7 +4,7 @@ import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenDto } from './dto/res/token.dto';
-import { Provider, User } from '@prisma/client';
+import { User } from '@prisma/client';
 import { NaverService } from 'src/naver/naver.service';
 
 @Injectable()
@@ -17,9 +17,9 @@ export class AuthService {
   ) {}
 
   public async login(loginDto: LoginDto): Promise<TokenDto> {
-    const { email, password } = loginDto;
+    const { loginId, password } = loginDto;
 
-    const user = await this.userService.findOneByEmail(email);
+    const user = await this.userService.findOneByLoginId(loginId);
     if (!user)
       throw new NotFoundException('비밀번호 또는 아이디가 일치하지 않습니다.');
 

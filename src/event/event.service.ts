@@ -11,9 +11,8 @@ import {
   Prisma,
   Variables,
 } from '@prisma/client';
-import { MessageService } from 'src/message/message.service';
+
 import { ContentService } from 'src/content/content.service';
-import { WorkspaceService } from 'src/workspace/workspace.service';
 import { format } from 'date-fns';
 import { ko } from 'date-fns/locale';
 
@@ -23,9 +22,7 @@ export class EventService {
 
   constructor(
     private readonly prismaService: PrismaService,
-    private readonly messageService: MessageService,
     private readonly contentService: ContentService,
-    private readonly workspaceService: WorkspaceService,
   ) {}
 
   public async findMany(workspaceId: number, dto: FindEventQueryDto) {
@@ -36,7 +33,7 @@ export class EventService {
         workspaceId,
         id,
         messageId,
-        productId,
+        productId: productId ? productId : null,
         productVariantId: productVariantId ? productVariantId : null,
       },
       include: { message: true },
@@ -54,7 +51,7 @@ export class EventService {
         workspaceId,
         id,
         messageId,
-        productId,
+        productId: productId ? productId : null,
         productVariantId: productVariantId ? productVariantId : null,
       },
     });
@@ -329,30 +326,17 @@ export class EventService {
       ...orderRest,
     };
 
-    const replaceTargetVariables = [
-      ...messageTemplate.variables,
-      { key: '#{이벤트_아이디}', value: '{이벤트아이디}' },
-    ];
-
-    const replacedVariables = replaceTargetVariables
-      .map((variable) => {
-        const { key, value } = variable;
-
-        return {
-          key,
-          value: this.messageService.replaceVariables(
-            variables,
-            variableBody,
-            value,
-          ),
-        };
-      })
-      .map(({ key, value }) => ({ [key]: value }))
-      .reduce((acc, cur) => ({ ...acc, ...cur }), {});
+    const messageVariables = variables.reduce((acc, variable) => {
+      const { key, value } = variable;
+      return {
+        ...acc,
+        [`#{${key}}`]: variableBody[value],
+      };
+    }, []);
 
     return {
       messageContent: kakaoTemplate.content,
-      messageVariables: replacedVariables,
+      messageVariables,
     };
   }
 

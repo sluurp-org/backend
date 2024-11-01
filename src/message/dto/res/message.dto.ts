@@ -7,22 +7,6 @@ import {
 import { Expose, Exclude, Type } from 'class-transformer';
 import { KakaoTemplateButtonType } from '../req/subtemplate/create-kakao-template-body.dto';
 
-export class MessageVariablesDto {
-  @Expose()
-  @ApiProperty({
-    description: '변수명',
-    example: 'name',
-  })
-  key: string;
-
-  @Expose()
-  @ApiProperty({
-    description: '값',
-    example: 'value',
-  })
-  value: string;
-}
-
 export class MessageContentGroupDto {
   @Expose()
   @ApiProperty({
@@ -178,15 +162,6 @@ export class MessageDto {
     example: '주문 완료',
   })
   name: string;
-
-  @Expose()
-  @ApiProperty({
-    description: '변수 할당',
-    type: MessageVariablesDto,
-    required: false,
-  })
-  @Type(() => MessageVariablesDto)
-  variables?: MessageVariablesDto[];
 
   @Expose()
   @ApiProperty({

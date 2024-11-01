@@ -17,11 +17,11 @@ export class UserDto {
   name: string;
 
   @ApiProperty({
-    description: '이메일',
-    example: 'example@example.com',
+    description: '아이디',
+    example: 'example',
   })
   @Expose()
-  email: string;
+  loginId: string;
 
   @ApiProperty({
     description: '전화번호',

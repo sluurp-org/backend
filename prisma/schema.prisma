@@ -31,8 +31,8 @@ enum VerificationType {
 model User {
   id       Int     @id @default(autoincrement())
   name     String?
+  loginId  String  @unique
   phone    String  @unique
-  email    String  @unique
   password String
   salt     String
 
@@ -468,9 +468,6 @@ model MessageTemplate {
   readonly         Boolean @default(false)
   isGlobal         Boolean @default(false)
 
-  /// [TemplateVariables]
-  variables Json?
-
   workspaceId     Int?
   kakaoTemplateId Int?
   contentGroupId  Int?
@@ -486,7 +483,7 @@ model MessageTemplate {
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @default(now()) @updatedAt
   event        Event[]
-  EventHistory EventHistory[]
+  eventHistory EventHistory[]
 }
 
 model KakaoTemplate {

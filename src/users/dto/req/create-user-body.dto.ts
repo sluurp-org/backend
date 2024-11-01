@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsNotEmpty,
   IsPhoneNumber,
   IsString,
@@ -19,12 +18,12 @@ export class CreateUserBodyDto {
   name: string;
 
   @ApiProperty({
-    description: '이메일',
-    example: 'example@example.com',
+    description: '유저 아이디',
+    example: 'example',
   })
-  @IsEmail()
+  @IsString()
   @IsNotEmpty()
-  email: string;
+  loginId: string;
 
   @ApiProperty({
     description: '비밀번호',

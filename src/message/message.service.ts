@@ -247,7 +247,6 @@ export class MessageService {
 
     const {
       name,
-      variables,
       contentGroupId,
       kakaoTemplate,
       completeDelivery,
@@ -269,7 +268,6 @@ export class MessageService {
         where: { id: messageId },
         data: {
           name,
-          variables: variables || [],
           contentGroupId,
           completeDelivery,
           target,
@@ -372,24 +370,5 @@ export class MessageService {
     }
 
     return baseButton as KakaoDefaultButton;
-  }
-
-  public replaceVariables(variables: Variables[], body: any, content: string) {
-    const variableMap = variables.reduce(
-      (map, variable) => {
-        map[variable.key] = variable.value;
-        return map;
-      },
-      {} as Record<string, string>,
-    );
-
-    const regex = /\{(.*?)\}/g;
-    const replacedStr = content.replace(regex, (match, p1) => {
-      const valueName = variableMap[p1];
-      const value = body[valueName];
-      return value !== undefined ? value?.toString() || '-' : match;
-    });
-
-    return replacedStr;
   }
 }

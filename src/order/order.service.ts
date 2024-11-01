@@ -147,6 +147,7 @@ export class OrderService {
     try {
       const events = await this.findEvents(
         workspaceId,
+        order.product.disableGlobalEvent,
         order.productId,
         order.productVariantId,
         order.status,
@@ -277,7 +278,7 @@ export class OrderService {
       where: { productId_storeId: { productId, storeId } },
       create: { workspaceId, storeId, productId, name: productName },
       update: { deletedAt: null },
-      select: { id: true },
+      select: { id: true, disableGlobalEvent: true },
     });
   }
 
@@ -346,7 +347,8 @@ export class OrderService {
 
   private async findEvents(
     workspaceId: number,
-    productId: number,
+    disableGlobalEvent: boolean,
+    productId: number | null,
     productVariantId: number | null,
     type: OrderStatus,
     transaction: Prisma.TransactionClient = this.prismaService,
@@ -363,6 +365,7 @@ export class OrderService {
               : null,
           },
           { productVariant: null },
+          !disableGlobalEvent && { productVariant: null, product: null },
         ],
         message: {
           readonly: false,
@@ -436,7 +439,8 @@ export class OrderService {
     if (previousOrder?.status !== updatedOrder.status) {
       const events = await this.findEvents(
         workspaceId,
-        product.id,
+        product.disableGlobalEvent,
+        product?.id,
         productVariant?.id,
         updatedOrder.status,
         transaction,

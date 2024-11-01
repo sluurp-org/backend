@@ -48,10 +48,10 @@ export class UsersService {
     }
   }
 
-  public async findOneByEmail(email: string): Promise<User> {
+  public async findOneByLoginId(loginId: string): Promise<User> {
     try {
       const user = await this.prismaService.user.findUnique({
-        where: { email, deletedAt: null },
+        where: { loginId, deletedAt: null },
       });
 
       return user;
@@ -111,7 +111,7 @@ export class UsersService {
 
       await this.kakaoService.sendKakaoMessage(
         phone,
-        'KA01TP241031050210587PffDuXQXVXz', // KA01TP241101000643373udDIuJU8YOy 로 교체 필요
+        'KA01TP241101000643373udDIuJU8YOy',
         {
           '#{발송유형}': mapSendType[type],
           '#{고객명}': name,
@@ -122,12 +122,12 @@ export class UsersService {
   }
 
   public async createUser(createUserBodyDto: CreateUserBodyDto): Promise<User> {
-    const { email, phone, code, password, ...createUserRest } =
+    const { loginId, phone, code, password, ...createUserRest } =
       createUserBodyDto;
 
-    const userExistsByEmail = await this.findOneByEmail(email);
-    if (userExistsByEmail)
-      throw new NotAcceptableException('이미 가입된 이메일입니다.');
+    const userExistsById = await this.findOneByLoginId(loginId);
+    if (userExistsById)
+      throw new NotAcceptableException('이미 가입된 아이디입니다.');
 
     const userExistsByPhone = await this.prismaService.user.findUnique({
       where: { phone },
@@ -158,7 +158,7 @@ export class UsersService {
       const user = await this.prismaService.user.create({
         data: {
           phone,
-          email,
+          loginId,
           salt,
           password: hash,
           ...createUserRest,

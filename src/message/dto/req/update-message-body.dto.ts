@@ -11,7 +11,6 @@ import {
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
-import { CreateVariableBodyDto } from './create-message-body.dto';
 import { MessageTarget } from '@prisma/client';
 
 export class UpdateKakaoTemplateBodyDto extends PartialType(
@@ -54,16 +53,6 @@ export class UpdateMessageBodyDto {
   @Type(() => CreateKakaoTemplateBodyDto)
   @ValidateNested()
   kakaoTemplate?: UpdateKakaoTemplateBodyDto;
-
-  @ApiProperty({
-    description: '변수 목록',
-    type: CreateVariableBodyDto,
-    isArray: true,
-  })
-  @IsOptional()
-  @Type(() => CreateVariableBodyDto)
-  @ValidateNested({ each: true })
-  variables: CreateVariableBodyDto[];
 
   @ApiProperty({
     description: '수신자 타입',

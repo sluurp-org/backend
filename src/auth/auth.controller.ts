@@ -3,7 +3,7 @@ import {
   Controller,
   Get,
   Post,
-  Query,
+  // Query,
   Redirect,
   Res,
   UseGuards,
@@ -108,38 +108,38 @@ export class AuthController {
     };
   }
 
-  @Get('naver/callback')
-  @ApiOperation({
-    summary: '네이버 로그인 콜백',
-  })
-  @Serialize(TokenDto)
-  @ApiResponse({
-    status: 200,
-    type: TokenDto,
-  })
-  async naverCallback(
-    @Query('code') code: string,
-    @Res({
-      passthrough: true,
-    })
-    res: Response,
-  ) {
-    const token = await this.authService.naverLogin(code);
+  // @Get('naver/callback')
+  // @ApiOperation({
+  //   summary: '네이버 로그인 콜백',
+  // })
+  // @Serialize(TokenDto)
+  // @ApiResponse({
+  //   status: 200,
+  //   type: TokenDto,
+  // })
+  // async naverCallback(
+  //   @Query('code') code: string,
+  //   @Res({
+  //     passthrough: true,
+  //   })
+  //   res: Response,
+  // ) {
+  //   const token = await this.authService.naverLogin(code);
 
-    res.cookie('accessToken', token.accessToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
+  //   res.cookie('accessToken', token.accessToken, {
+  //     domain: 'localhost',
+  //     httpOnly: false,
+  //     secure: true,
+  //     sameSite: 'none',
+  //   });
 
-    res.cookie('refreshToken', token.refreshToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
+  //   res.cookie('refreshToken', token.refreshToken, {
+  //     domain: 'localhost',
+  //     httpOnly: false,
+  //     secure: true,
+  //     sameSite: 'none',
+  //   });
 
-    return token;
-  }
+  //   return token;
+  // }
 }

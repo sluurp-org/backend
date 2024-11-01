@@ -56,12 +56,13 @@ export class WorkspaceService {
     try {
       return await this.prismaService.$transaction(async (tx) => {
         const nextPurchaseAt = new Date();
-        nextPurchaseAt.setMonth(nextPurchaseAt.getMonth() + 1);
+        nextPurchaseAt.setDate(nextPurchaseAt.getDate() + 14);
         nextPurchaseAt.setHours(0, 0, 0, 0);
 
         const workspace = await tx.workspace.create({
           data: {
             ...createWorkspaceDto,
+            lastPurchaseAt: new Date(),
             nextPurchaseAt,
             workspaceUser: {
               create: {

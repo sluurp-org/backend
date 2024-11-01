@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsEmail,
   IsNotEmpty,
   IsPhoneNumber,
   IsString,
@@ -9,29 +8,31 @@ import {
   MinLength,
 } from 'class-validator';
 
-export class CreateUserBodyDto {
+export class ChangePasswordByCodeDto {
   @ApiProperty({
-    description: '사용자 이름',
-    example: '홍길동',
+    description: '휴대폰 번호',
+    example: '01012345678',
   })
+  @IsPhoneNumber('KR')
+  @IsNotEmpty()
+  phone: string;
+
+  @ApiProperty({
+    description: '코드',
+    example: '123456',
+  })
+  @IsNotEmpty()
   @IsString()
-  @IsNotEmpty()
-  name: string;
+  @MinLength(6)
+  @MaxLength(6)
+  code: string;
 
   @ApiProperty({
-    description: '이메일',
-    example: 'example@example.com',
-  })
-  @IsEmail()
-  @IsNotEmpty()
-  email: string;
-
-  @ApiProperty({
-    description: '비밀번호',
+    description: '새 비밀번호',
     example: 'password',
   })
-  @IsString()
   @IsNotEmpty()
+  @IsString()
   @IsStrongPassword(
     {
       minLength: 8,
@@ -45,22 +46,4 @@ export class CreateUserBodyDto {
     },
   )
   password: string;
-
-  @ApiProperty({
-    description: '휴대폰 번호',
-    example: '01012345678',
-  })
-  @IsPhoneNumber('KR')
-  @IsNotEmpty()
-  phone: string;
-
-  @ApiProperty({
-    description: '인증 코드',
-    example: '123456',
-  })
-  @IsString()
-  @MinLength(6)
-  @MaxLength(6)
-  @IsNotEmpty()
-  code: string;
 }

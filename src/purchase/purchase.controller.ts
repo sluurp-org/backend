@@ -15,13 +15,28 @@ import {
 import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { BillingDto } from './dto/res/billing.dto';
 import { ApiOkResponsePaginated } from 'src/common/decorators/api-ok-response-paginated.decorator';
-import { PurchaseHistoryDto } from './dto/res/purchase-history';
+import { PurchaseHistoryDto } from './dto/res/purchase-history.dto';
 import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
+import { PurchaseDto } from './dto/res/purchase.dto';
 
 @ApiTags('Purchase')
 @WorkspaceController('purchase')
 export class PurchaseController {
   constructor(private readonly purchaseService: PurchaseService) {}
+
+  @Get()
+  @ApiOperation({
+    summary: '결제 정보 조회',
+    description: '워크스페이스의 결제 정보를 조회합니다.',
+  })
+  @Serialize(PurchaseDto)
+  @ApiOkResponse({
+    type: PurchaseDto,
+  })
+  @WorkspaceAuth([WorkspaceRole.OWNER])
+  public async getPUrchase(@ReqWorkspace() { id: workspaceId }: Workspace) {
+    return this.purchaseService.getPurchase(workspaceId);
+  }
 
   @Get('billing')
   @ApiOperation({

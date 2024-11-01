@@ -12,9 +12,26 @@ datasource db {
   url      = env("DATABASE_URL")
 }
 
+model PhoneVerification {
+  id Int @id @default(autoincrement())
+
+  phone     String
+  code      String
+  type      VerificationType
+  expiredAt DateTime
+
+  @@unique([phone, type])
+}
+
+enum VerificationType {
+  REGISTER
+  FIND_PASSWORD
+}
+
 model User {
   id       Int     @id @default(autoincrement())
   name     String?
+  phone    String  @unique
   email    String  @unique
   password String
   salt     String
@@ -89,6 +106,7 @@ model Workspace {
   purchaseHistory  PurchaseHistory[]
   workspaceBilling WorkspaceBilling?
   eventHistory     EventHistory[]
+  Recepit          Recepit[]
 }
 
 model WorkspaceBilling {
@@ -510,6 +528,32 @@ model Variables {
   updatedAt DateTime @default(now()) @updatedAt
 }
 
+model Recepit {
+  id Int @id @default(autoincrement())
+
+  workspaceId Int
+
+  emailSendCount    Int @default(0)
+  alimtalkSendCount Int @default(0)
+  contentSendCount  Int @default(0)
+
+  emailPrice    Int @default(0)
+  alimtalkPrice Int @default(0)
+  contentPrice  Int @default(0)
+
+  amount         Int @default(0)
+  discountAmount Int @default(0)
+  totalAmount    Int @default(0)
+
+  issuedAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @default(now()) @updatedAt
+  PurchaseHistory PurchaseHistory[]
+}
+
 model PurchaseHistory {
   id String @id @default(uuid())
 
@@ -526,7 +570,9 @@ model PurchaseHistory {
 
   billingId   Int?
   scheduledId String?
+  recepitId   Int
 
+  recepit   Recepit           @relation(fields: [recepitId], references: [id])
   workspace Workspace         @relation(fields: [workspaceId], references: [id])
   billing   WorkspaceBilling? @relation(fields: [billingId], references: [id])
 

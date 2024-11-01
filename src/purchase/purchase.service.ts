@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PortoneService } from 'src/portone/portone.service';
-import { EventStatus, Prisma, PurchaseStatus } from '@prisma/client';
+import { Config, EventStatus, Prisma, PurchaseStatus } from '@prisma/client';
 import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
 import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
@@ -24,6 +24,27 @@ export class PurchaseService {
     private readonly portoneService: PortoneService,
     private readonly telegramService: TelegramService,
   ) {}
+
+  public async getPurchase(workspaceId: number) {
+    const workspace = await this.prismaService.workspace.findUnique({
+      where: { id: workspaceId },
+    });
+    if (!workspace)
+      throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
+
+    const config = await this.prismaService.config.findUnique({
+      where: { id: 1 },
+    });
+    if (!config) throw new NotFoundException('설정 정보를 찾을 수 없습니다.');
+
+    const { lastPurchaseAt, nextPurchaseAt } = workspace;
+    return this.calculatePurchasePrice(
+      workspaceId,
+      config,
+      lastPurchaseAt,
+      nextPurchaseAt,
+    );
+  }
 
   public async findBilling(workspaceId: number) {
     return this.prismaService.workspaceBilling.findUnique({
@@ -111,6 +132,66 @@ export class PurchaseService {
     return false;
   }
 
+  public async calculatePurchasePrice(
+    workspaceId: number,
+    config: Config,
+    lastPurchaseAt: Date,
+    nextPurchaseAt: Date,
+    transaction: Prisma.TransactionClient = this.prismaService,
+  ) {
+    const { defaultPrice, alimtalkSendPrice, contentSendPrice } = config;
+    const freeTrialAvailable = await this.isFreeTrialAvailable(workspaceId);
+
+    const eventHistories = await transaction.eventHistory.findMany({
+      where: {
+        workspaceId,
+        status: EventStatus.SUCCESS,
+        processedAt: { gte: lastPurchaseAt, lt: nextPurchaseAt },
+      },
+      include: { contents: true },
+    });
+
+    // 금액 계산 후 오름차순 정렬
+    const purchasePrice = eventHistories
+      .reduce<{ isContentSend: boolean; price: number }[]>((acc, cur) => {
+        let price = alimtalkSendPrice;
+        if (cur.contents.length > 0)
+          price += contentSendPrice * cur.contents.length;
+
+        acc.push({
+          isContentSend: cur.contents.length > 0 ? true : false,
+          price,
+        });
+
+        return acc;
+      }, [])
+      .sort((a, b) => a.price - b.price);
+
+    const amount =
+      purchasePrice.reduce((acc, cur) => acc + cur.price, 0) + defaultPrice;
+
+    const discountAmount = freeTrialAvailable
+      ? amount
+      : purchasePrice.slice(0, 100).reduce((acc, cur) => acc + cur.price, 0);
+
+    const totalAmount = freeTrialAvailable ? 0 : amount - discountAmount;
+
+    const contentSendCount = purchasePrice.filter(
+      (item) => item.isContentSend,
+    ).length;
+    const alimtalkSendCount = purchasePrice.length;
+
+    return {
+      freeTrialAvailable,
+      contentSendCount,
+      alimtalkSendCount,
+      amount,
+      discountAmount,
+      totalAmount,
+      ...config,
+    };
+  }
+
   public async createPurchase() {
     const workspaces = await this.prismaService.workspace.findMany({
       where: { deletedAt: null, nextPurchaseAt: { lte: new Date() } },
@@ -123,71 +204,73 @@ export class PurchaseService {
       throw new NotFoundException('설정 정보를 찾을 수 없습니다.');
     }
 
-    const { defaultPrice, alimtalkSendPrice, contentSendPrice } = config;
+    const { alimtalkSendPrice, contentSendPrice } = config;
 
     for (const workspace of workspaces) {
-      const nextPurchaseAt = new Date(workspace.nextPurchaseAt);
-      nextPurchaseAt.setMonth(nextPurchaseAt.getMonth() + 1);
-      nextPurchaseAt.setHours(0, 0, 0, 0);
+      const { lastPurchaseAt, nextPurchaseAt } = workspace;
+
+      const newNextPurchaseAt = new Date(nextPurchaseAt);
+      newNextPurchaseAt.setDate(newNextPurchaseAt.getDate() + 30);
 
       await this.prismaService.workspace.update({
         where: { id: workspace.id },
-        data: { nextPurchaseAt, lastPurchaseAt: new Date() },
+        data: {
+          nextPurchaseAt: newNextPurchaseAt,
+          lastPurchaseAt: nextPurchaseAt,
+        },
       });
 
       await this.prismaService.$transaction(async (transaction) => {
-        const eventHistories = await transaction.eventHistory.findMany({
-          where: {
-            workspaceId: workspace.id,
-            status: EventStatus.SUCCESS,
-            processedAt: { gte: workspace.lastPurchaseAt, lt: nextPurchaseAt },
-          },
-          include: { messageTemplate: true },
-        });
-
         const billing = await transaction.workspaceBilling.findUnique({
           where: { workspaceId: workspace.id },
         });
-
-        // 금액 계산 후 오름차순 정렬
-        const purchasePrice = eventHistories
-          .reduce((acc, cur) => {
-            let price = alimtalkSendPrice;
-            if (cur.messageTemplate.contentGroupId) price += contentSendPrice;
-
-            acc.push(price);
-            return acc;
-          }, [])
-          .sort((a, b) => a - b);
-
-        const discountAmount = purchasePrice
-          .slice(0, 100)
-          .reduce((acc, cur) => acc + cur, 0);
-
-        const amount =
-          purchasePrice.reduce((acc, cur) => acc + cur, 0) + defaultPrice;
 
         if (!billing) {
           this.logger.error(
             `워크스페이스(${workspace.id})에 결제 정보가 없습니다.`,
           );
-
           return;
         }
-        const freeTrialAvailable = await this.isFreeTrialAvailable(
+
+        const {
+          freeTrialAvailable,
+          contentSendCount,
+          alimtalkSendCount,
+          amount,
+          discountAmount,
+          totalAmount,
+        } = await this.calculatePurchasePrice(
           workspace.id,
+          config,
+          lastPurchaseAt,
+          nextPurchaseAt,
+          transaction,
         );
+
+        const createPurchaseRecepit: Prisma.RecepitCreateInput = {
+          workspace: { connect: { id: workspace.id } },
+          contentSendCount,
+          alimtalkSendCount,
+          alimtalkPrice: alimtalkSendPrice,
+          contentPrice: contentSendPrice,
+          amount,
+          discountAmount,
+          totalAmount,
+        };
 
         if (freeTrialAvailable) {
           const purchase = await transaction.purchaseHistory.create({
             data: {
-              workspaceId: workspace.id,
-              billingId: billing.id,
+              workspace: { connect: { id: workspace.id } },
+              billing: { connect: { id: billing.id } },
               amount,
               discountAmount: amount,
               totalAmount: 0,
               reason: '한달 무료체험',
               status: PurchaseStatus.PAID,
+              recepit: {
+                create: createPurchaseRecepit,
+              },
             },
           });
 
@@ -196,18 +279,21 @@ export class PurchaseService {
 
         const purchase = await transaction.purchaseHistory.create({
           data: {
-            workspaceId: workspace.id,
-            billingId: billing.id,
+            workspace: { connect: { id: workspace.id } },
+            billing: { connect: { id: billing.id } },
             amount,
             discountAmount,
-            totalAmount: amount - discountAmount,
+            totalAmount,
             reason: '스르륵 메세지 발송비용 청구',
             status: PurchaseStatus.READY,
+            recepit: {
+              create: createPurchaseRecepit,
+            },
           },
         });
 
         const { billingKey } = billing;
-        const { id: paymentKey, totalAmount } = purchase;
+        const { id: paymentKey } = purchase;
         const { name: workspaceName, id: workspaceId } = workspace;
 
         try {

@@ -27,7 +27,7 @@ export class TelegramService {
     if (context) sendMessage += `컨텍스트 : ${context}\n`;
     if (userId) sendMessage += `유저 아이디 : ${userId}\n`;
     if (workspaceId) sendMessage += `워크스페이스 아이디: ${workspaceId}\n`;
-    sendMessage += `\d에러 메세지:\n${message}`;
+    sendMessage += `\n에러 메세지:\n${message}`;
 
     if (error)
       sendMessage += `\n\n상세정보:\n${error.message}\n\n${error.stack}`;

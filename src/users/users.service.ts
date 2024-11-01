@@ -6,11 +6,14 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Provider, User } from '@prisma/client';
+import { Provider, User, VerificationType } from '@prisma/client';
 import * as crypto from 'crypto';
 import { CreateUserBodyDto } from './dto/req/create-user-body.dto';
 import { UpdateUserBodyDto } from './dto/req/update-user-body.dto';
 import { ConfigService } from '@nestjs/config';
+import { KakaoService } from 'src/kakao/kakao.service';
+import { differenceInSeconds } from 'date-fns';
+import { ChangePasswordByCodeDto } from './dto/req/find-user-by-phone-body.dto copy';
 
 @Injectable()
 export class UsersService {
@@ -18,7 +21,17 @@ export class UsersService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly configService: ConfigService,
+    private readonly kakaoService: KakaoService,
   ) {}
+
+  public async findOneByPhone(phone: string, name: string): Promise<User> {
+    const user = await this.prismaService.user.findFirst({
+      where: { phone, name },
+    });
+    if (!user) throw new NotFoundException('사용자 정보가 없습니다.');
+
+    return user;
+  }
 
   public async findOneById(userId: number): Promise<User> {
     try {
@@ -50,24 +63,110 @@ export class UsersService {
     }
   }
 
+  public async phoneVerification(
+    name: string,
+    phone: string,
+    type: VerificationType = VerificationType.REGISTER,
+  ) {
+    const code = Math.floor(100000 + Math.random() * 900000);
+
+    const recentPhoneVerification =
+      await this.prismaService.phoneVerification.findUnique({
+        where: {
+          phone_type: {
+            phone,
+            type,
+          },
+        },
+      });
+    if (recentPhoneVerification?.expiredAt > new Date())
+      throw new NotAcceptableException(
+        `${differenceInSeconds(recentPhoneVerification.expiredAt, new Date())}초 후 다시 시도해주세요.`,
+      );
+
+    await this.prismaService.$transaction(async (tx) => {
+      await tx.phoneVerification.upsert({
+        where: {
+          phone_type: {
+            phone,
+            type,
+          },
+        },
+        create: {
+          phone,
+          type,
+          code: code.toString(),
+          expiredAt: new Date(Date.now() + 1000 * 60 * 3),
+        },
+        update: {
+          code: code.toString(),
+          expiredAt: new Date(Date.now() + 1000 * 60 * 3),
+        },
+      });
+
+      const mapSendType: Record<VerificationType, string> = {
+        [VerificationType.REGISTER]: '가입',
+        [VerificationType.FIND_PASSWORD]: '비밀번호 찾기',
+      };
+
+      await this.kakaoService.sendKakaoMessage(
+        phone,
+        'KA01TP241031050210587PffDuXQXVXz', // KA01TP241101000643373udDIuJU8YOy 로 교체 필요
+        {
+          '#{발송유형}': mapSendType[type],
+          '#{고객명}': name,
+          '#{인증번호}': code.toString(),
+        },
+      );
+    });
+  }
+
   public async createUser(createUserBodyDto: CreateUserBodyDto): Promise<User> {
-    const userExistsByEmail = await this.findOneByEmail(
-      createUserBodyDto.email,
-    );
+    const { email, phone, code, password, ...createUserRest } =
+      createUserBodyDto;
+
+    const userExistsByEmail = await this.findOneByEmail(email);
     if (userExistsByEmail)
       throw new NotAcceptableException('이미 가입된 이메일입니다.');
 
+    const userExistsByPhone = await this.prismaService.user.findUnique({
+      where: { phone },
+    });
+    if (userExistsByPhone)
+      throw new NotAcceptableException('이미 가입된 전화번호입니다.');
+
+    const phoneVerification =
+      await this.prismaService.phoneVerification.findUnique({
+        where: {
+          phone_type: {
+            phone,
+            type: VerificationType.REGISTER,
+          },
+          code,
+          expiredAt: {
+            gte: new Date(),
+          },
+        },
+      });
+    if (!phoneVerification)
+      throw new NotAcceptableException('인증번호가 올바르지 않습니다.');
+
     try {
-      const { password } = createUserBodyDto;
       const salt = crypto.randomBytes(32).toString('hex');
       const hash = this.hashPassword(password, salt);
 
       const user = await this.prismaService.user.create({
         data: {
-          ...createUserBodyDto,
-          password: hash,
+          phone,
+          email,
           salt,
+          password: hash,
+          ...createUserRest,
         },
+      });
+
+      await this.prismaService.phoneVerification.delete({
+        where: { id: phoneVerification.id },
       });
 
       return user;
@@ -79,35 +178,79 @@ export class UsersService {
     }
   }
 
-  public async createUserByProvider(
-    createUserBodyDto: CreateUserBodyDto,
-    provider: Provider,
-    providerId: string,
-  ): Promise<User> {
-    const userExistsByProvider = await this.findOneByProvider(
-      provider,
-      providerId,
-    );
-    if (userExistsByProvider)
-      throw new NotAcceptableException('이미 가입된 계정입니다.');
+  public async changePasswordByCode(dto: ChangePasswordByCodeDto) {
+    const { phone, code, password } = dto;
+
+    const phoneVerification =
+      await this.prismaService.phoneVerification.findUnique({
+        where: {
+          phone_type: {
+            phone,
+            type: VerificationType.FIND_PASSWORD,
+          },
+          code,
+          expiredAt: {
+            gte: new Date(),
+          },
+        },
+      });
+    if (!phoneVerification)
+      throw new NotAcceptableException('인증번호가 올바르지 않습니다.');
 
     try {
-      return await this.prismaService.user.create({
-        data: {
-          ...createUserBodyDto,
-          password: '',
-          salt: '',
-          provider,
-          providerId,
-        },
+      const salt = crypto.randomBytes(32).toString('hex');
+      const hash = this.hashPassword(password, salt);
+
+      await this.prismaService.$transaction(async (tx) => {
+        await tx.user.update({
+          where: { phone },
+          data: {
+            salt,
+            password: hash,
+          },
+        });
+
+        await tx.phoneVerification.delete({
+          where: { id: phoneVerification.id },
+        });
       });
     } catch (error) {
       this.logger.error(error.message);
       throw new InternalServerErrorException(
-        '사용자 정보를 저장하는 중 오류가 발생했습니다.',
+        '비밀번호를 변경하는 중 오류가 발생했습니다.',
       );
     }
   }
+
+  // public async createUserByProvider(
+  //   createUserBodyDto: CreateUserBodyDto,
+  //   provider: Provider,
+  //   providerId: string,
+  // ): Promise<User> {
+  //   const userExistsByProvider = await this.findOneByProvider(
+  //     provider,
+  //     providerId,
+  //   );
+  //   if (userExistsByProvider)
+  //     throw new NotAcceptableException('이미 가입된 계정입니다.');
+
+  //   try {
+  //     return await this.prismaService.user.create({
+  //       data: {
+  //         ...createUserBodyDto,
+  //         password: '',
+  //         salt: '',
+  //         provider,
+  //         providerId,
+  //       },
+  //     });
+  //   } catch (error) {
+  //     this.logger.error(error.message);
+  //     throw new InternalServerErrorException(
+  //       '사용자 정보를 저장하는 중 오류가 발생했습니다.',
+  //     );
+  //   }
+  // }
 
   public async updateUserById(
     userId: number,

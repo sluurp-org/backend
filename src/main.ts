@@ -5,12 +5,12 @@ import { PostStatusInterceptor } from './common/interceptor/post-status.intercep
 import { HttpExceptionFilter } from './common/filters/http-exception.filter';
 import { AppModule } from './app.module';
 import { PrismaClientExceptionFilter } from './common/filters/prisma-exception.filter';
-// import { ConfigService } from '@nestjs/config';
+import { ConfigService } from '@nestjs/config';
 import * as expressBasicAuth from 'express-basic-auth';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  // const configService = app.get(ConfigService);
+  const configService = app.get(ConfigService);
 
   app.useGlobalPipes(
     new ValidationPipe({
@@ -50,13 +50,14 @@ async function bootstrap() {
     )
     .build();
 
+  const userName = configService.get('SWAGGER_USERNAME');
+  const password = configService.get('SWAGGER_PASSWORD');
+
   app.use(
     ['/api', '/api-json'],
     expressBasicAuth({
       challenge: true,
-      users: {
-        [process.env.SWAGGER_USER]: process.env.SWAGGER_PASSWORD,
-      },
+      users: { [userName]: password },
     }),
   );
 

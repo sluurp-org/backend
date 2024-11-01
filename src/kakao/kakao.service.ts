@@ -19,6 +19,7 @@ import { ConnectChannelBodyDto } from './dto/req/connect-channel-body.dto';
 import { firstValueFrom } from 'rxjs';
 import { HttpService } from '@nestjs/axios';
 import sizeOf from 'image-size';
+import { TelegramService } from 'src/telegram/telegram.service';
 
 @Injectable()
 export class KakaoService {
@@ -29,6 +30,7 @@ export class KakaoService {
     private readonly configService: ConfigService,
     private readonly prismaService: PrismaService,
     private readonly httpService: HttpService,
+    private readonly telegramService: TelegramService,
   ) {
     this.provisionKakaoService();
   }
@@ -395,5 +397,37 @@ export class KakaoService {
 
     const signature = hmac.digest('hex');
     return `HMAC-SHA256 apiKey=${apiKey}, date=${currentDate}, salt=${salt}, signature=${signature}`;
+  }
+
+  public async sendKakaoMessage(
+    to: string,
+    templateId: string,
+    variables: any,
+  ) {
+    const from = this.configService.get('SOLAPI_SENDER');
+
+    try {
+      await this.solapiMessageService.send({
+        from,
+        to,
+        kakaoOptions: {
+          pfId: this.configService.get('SOLAPI_PFID'),
+          templateId,
+          variables,
+        },
+      });
+    } catch (error) {
+      this.logger.error(error);
+      this.telegramService.sendMessage({
+        fetal: true,
+        message: `카카오 메시지 전송에 실패했습니다. to: ${to}, templateId: ${templateId}, variables: ${JSON.stringify(variables)}`,
+        context: KakaoService.name,
+        error,
+      });
+
+      throw new InternalServerErrorException(
+        '카카오 메시지 전송에 실패했습니다.',
+      );
+    }
   }
 }

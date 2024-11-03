@@ -1,7 +1,13 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { OrderStatus } from '@prisma/client';
 import { Transform } from 'class-transformer';
-import { IsEnum, IsNumber, IsOptional, IsString } from 'class-validator';
+import {
+  IsDate,
+  IsEnum,
+  IsNumber,
+  IsOptional,
+  IsString,
+} from 'class-validator';
 import { PaginationQueryDto } from 'src/common/dto/req/pagination-query.dto';
 
 export class FindOrderQueryDto extends PaginationQueryDto {
@@ -52,4 +58,22 @@ export class FindOrderQueryDto extends PaginationQueryDto {
   @IsEnum(OrderStatus)
   @IsOptional()
   status?: OrderStatus;
+
+  @ApiProperty({
+    description: '주문 시작일',
+    example: '2021-01-01',
+    required: false,
+  })
+  @IsDate()
+  @IsOptional()
+  startDate?: Date;
+
+  @ApiProperty({
+    description: '주문 종료일',
+    example: '2021-01-01',
+    required: false,
+  })
+  @IsDate()
+  @IsOptional()
+  endDate?: Date;
 }

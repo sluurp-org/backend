@@ -1,4 +1,4 @@
-import { Module } from '@nestjs/common';
+import { forwardRef, Module } from '@nestjs/common';
 import { KakaoService } from './kakao.service';
 import { KakaoController } from './kakao.controller';
 import { WorkspaceModule } from 'src/workspace/workspace.module';
@@ -9,7 +9,7 @@ import { TelegramModule } from 'src/telegram/telegram.module';
 @Module({
   imports: [
     PrismaModule,
-    WorkspaceModule,
+    forwardRef(() => WorkspaceModule),
     HttpModule.register({
       baseURL: 'https://api.solapi.com',
       headers: {

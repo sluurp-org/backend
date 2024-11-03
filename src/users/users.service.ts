@@ -109,15 +109,17 @@ export class UsersService {
         [VerificationType.FIND_PASSWORD]: '비밀번호 찾기',
       };
 
-      await this.kakaoService.sendKakaoMessage(
-        phone,
-        'KA01TP241101000643373udDIuJU8YOy',
+      await this.kakaoService.sendKakaoMessage([
         {
-          '#{발송유형}': mapSendType[type],
-          '#{고객명}': name,
-          '#{인증번호}': code.toString(),
+          to: phone,
+          templateId: 'KA01TP241101000643373udDIuJU8YOy',
+          variables: {
+            '#{발송유형}': mapSendType[type],
+            '#{고객명}': name,
+            '#{인증번호}': code.toString(),
+          },
         },
-      );
+      ]);
     });
   }
 

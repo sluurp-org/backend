@@ -6,6 +6,7 @@ import { SmartstoreModule } from 'src/smartstore/smartstore.module';
 import { StoreModule } from 'src/store/store.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PurchaseModule } from 'src/purchase/purchase.module';
+import { KakaoModule } from 'src/kakao/kakao.module';
 
 @Module({
   imports: [
@@ -15,6 +16,7 @@ import { PurchaseModule } from 'src/purchase/purchase.module';
     StoreModule,
     PrismaModule,
     PurchaseModule,
+    KakaoModule,
   ],
   controllers: [WorkerController],
   providers: [WorkerService],

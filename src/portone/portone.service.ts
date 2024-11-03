@@ -133,6 +133,10 @@ export class PortoneService {
 
       return payment.paidAt;
     } catch (error) {
+      if (isAxiosError(error)) {
+        console.log(error.response.data);
+      }
+
       throw new InternalServerErrorException('결제 요청에 실패했습니다.');
     }
   }

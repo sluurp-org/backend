@@ -11,6 +11,20 @@ export class PurchaseDto {
 
   @Expose()
   @ApiProperty({
+    example: true,
+    description: '결제 여부',
+  })
+  noPurchase: boolean;
+
+  @Expose()
+  @ApiProperty({
+    example: '2021-08-01',
+    description: '다음 결제 예정일',
+  })
+  nextPurchaseAt: Date;
+
+  @Expose()
+  @ApiProperty({
     example: 0,
     description: '콘텐츠 발송 횟수',
   })

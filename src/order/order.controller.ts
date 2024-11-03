@@ -20,6 +20,19 @@ export class OrderController {
   constructor(private readonly orderService: OrderService) {}
 
   @ApiOperation({
+    summary: '주문 카운트',
+    description: '주문을 카운트합니다.',
+  })
+  @Get('count')
+  @WorkspaceAuth([WorkspaceRole.OWNER, WorkspaceRole.MEMBER])
+  public async count(
+    @ReqWorkspace() { id: workspaceId }: Workspace,
+    @Query() dto: FindOrderQueryDto,
+  ) {
+    return this.orderService.count(workspaceId, dto);
+  }
+
+  @ApiOperation({
     summary: '주문 조회',
     description: '주문을 조회하고 검색합니다.',
   })

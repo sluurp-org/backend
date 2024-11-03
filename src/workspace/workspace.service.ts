@@ -9,12 +9,16 @@ import { WorkspaceRole, WorkspaceUser } from '@prisma/client';
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
+import { KakaoService } from 'src/kakao/kakao.service';
 
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
 
-  constructor(private readonly prismaService: PrismaService) {}
+  constructor(
+    private readonly prismaService: PrismaService,
+    private readonly kakaoService: KakaoService,
+  ) {}
 
   public async findOneById(id: number) {
     try {
@@ -120,6 +124,8 @@ export class WorkspaceService {
       throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
     try {
+      await this.kakaoService.deleteKakaoChannel(id);
+
       const workspace = await this.prismaService.workspace.update({
         where: { id },
         data: { deletedAt: new Date() },

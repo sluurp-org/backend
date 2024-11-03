@@ -400,27 +400,31 @@ export class KakaoService {
   }
 
   public async sendKakaoMessage(
-    to: string,
-    templateId: string,
-    variables: any,
+    messages: {
+      to: string | string[];
+      templateId: string;
+      variables: any;
+    }[],
   ) {
     const from = this.configService.get('SOLAPI_SENDER');
 
     try {
-      await this.solapiMessageService.send({
-        from,
-        to,
-        kakaoOptions: {
-          pfId: this.configService.get('SOLAPI_PFID'),
-          templateId,
-          variables,
-        },
-      });
+      await this.solapiMessageService.send(
+        messages.map(({ to, templateId, variables }) => ({
+          from,
+          to,
+          kakaoOptions: {
+            pfId: this.configService.get('SOLAPI_PFID'),
+            templateId,
+            variables,
+          },
+        })),
+      );
     } catch (error) {
       this.logger.error(error);
       this.telegramService.sendMessage({
         fetal: true,
-        message: `카카오 메시지 전송에 실패했습니다. to: ${to}, templateId: ${templateId}, variables: ${JSON.stringify(variables)}`,
+        message: `카카오 메시지 전송에 실패했습니다.\n\n${JSON.stringify(messages)}`,
         context: KakaoService.name,
         error,
       });

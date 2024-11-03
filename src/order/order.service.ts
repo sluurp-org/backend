@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotFoundException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { Order, OrderHistoryType, OrderStatus, Prisma } from '@prisma/client';
 import { FindOrderQueryDto } from './dto/req/find-order-query.dto';
@@ -14,6 +19,7 @@ import { UpdateOrderBodyDto } from './dto/req/update-order-body';
 import { EventService } from 'src/event/event.service';
 import { randomUUID } from 'crypto';
 import { FindOrderHistoryQueryDto } from './dto/req/find-order-history-query.dto';
+import { differenceInDays } from 'date-fns';
 
 @Injectable()
 export class OrderService {
@@ -56,8 +62,18 @@ export class OrderService {
       productOrderId,
       status,
       storeId,
+      startDate,
+      endDate,
     }: FindOrderQueryDto,
   ) {
+    if (startDate && endDate && startDate > endDate)
+      throw new BadRequestException(
+        '시작일자가 종료일자보다 늦을 수 없습니다.',
+      );
+
+    if (differenceInDays(endDate, startDate) > 60)
+      throw new BadRequestException('조회 기간은 60일 이내로 설정 가능합니다.');
+
     return this.prismaService.order.findMany({
       where: {
         workspaceId,
@@ -66,6 +82,9 @@ export class OrderService {
         productOrderId,
         status,
         storeId,
+        ...(startDate && endDate
+          ? { createdAt: { gte: startDate, lte: endDate } }
+          : {}),
         deletedAt: null,
         store: {
           deletedAt: null,
@@ -86,7 +105,15 @@ export class OrderService {
 
   public async count(
     workspaceId: number,
-    { id, orderId, productOrderId, status, storeId }: FindOrderQueryDto,
+    {
+      id,
+      orderId,
+      productOrderId,
+      status,
+      storeId,
+      startDate,
+      endDate,
+    }: FindOrderQueryDto,
   ): Promise<number> {
     return await this.prismaService.order.count({
       where: {
@@ -96,6 +123,9 @@ export class OrderService {
         productOrderId,
         status,
         storeId,
+        ...(startDate && endDate
+          ? { createdAt: { gte: startDate, lte: endDate } }
+          : {}),
         deletedAt: null,
         store: {
           deletedAt: null,
@@ -124,8 +154,6 @@ export class OrderService {
   public async create(workspaceId: number, dto: CreateOrderBodyDto) {
     const { orderAt, ordererName, ordererPhone, receiverName, receiverPhone } =
       dto;
-
-    console.log('order create');
 
     const order = await this.prismaService.order.create({
       data: {

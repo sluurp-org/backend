@@ -1,4 +1,4 @@
-import { Body, Get, Post, Query } from '@nestjs/common';
+import { Body, Get, Param, Post, Query } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
 import { Workspace, WorkspaceRole } from '@prisma/client';
@@ -34,7 +34,7 @@ export class PurchaseWorkspaceController {
     type: PurchaseDto,
   })
   @WorkspaceAuth([WorkspaceRole.OWNER])
-  public async getPUrchase(@ReqWorkspace() { id: workspaceId }: Workspace) {
+  public async getPurchase(@ReqWorkspace() { id: workspaceId }: Workspace) {
     return this.purchaseService.getPurchase(workspaceId);
   }
 
@@ -89,5 +89,22 @@ export class PurchaseWorkspaceController {
     );
 
     return { nodes, total };
+  }
+
+  @Post(':purchaseId')
+  @ApiOperation({
+    summary: '결제 요청',
+    description: '워크스페이스의 결제를 요청합니다.',
+  })
+  @Serialize(PurchaseDto)
+  @ApiOkResponse({
+    type: PurchaseDto,
+  })
+  @WorkspaceAuth([WorkspaceRole.OWNER])
+  public async requestPurchase(
+    @ReqWorkspace() { id: workspaceId }: Workspace,
+    @Param('purchaseId') purchaseId: string,
+  ) {
+    return this.purchaseService.purchaseReuqest(workspaceId, purchaseId);
   }
 }

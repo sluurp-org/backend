@@ -1,5 +1,6 @@
 import {
   Injectable,
+  InternalServerErrorException,
   Logger,
   NotAcceptableException,
   NotFoundException,
@@ -16,7 +17,7 @@ import { TelegramService } from 'src/telegram/telegram.service';
 @Injectable()
 export class PurchaseService {
   private readonly MAX_RETRY_COUNT = 3; // 재결제 최대 시도 횟수
-  private readonly RETRY_INTERVAL_DAYS = 1; // 재결제 시도 간격 (1일)
+  private readonly RETRY_INTERVAL_DAYS = 2; // 재결제 시도 간격 (2일)
   private readonly logger = new Logger(PurchaseService.name);
 
   constructor(
@@ -44,12 +45,104 @@ export class PurchaseService {
     if (!config) throw new NotFoundException('설정 정보를 찾을 수 없습니다.');
 
     const { lastPurchaseAt, nextPurchaseAt } = workspace;
-    return this.calculatePurchasePrice(
+    const purcahse = await this.calculatePurchasePrice(
       workspaceId,
       config,
       lastPurchaseAt,
       nextPurchaseAt,
     );
+
+    return {
+      ...purcahse,
+      nextPurchaseAt,
+    };
+  }
+
+  public async purchaseReuqest(workspaceId: number, purchaseId: string) {
+    const purchase = await this.prismaService.purchaseHistory.findUnique({
+      where: { id: purchaseId, workspaceId },
+    });
+    if (!purchase) throw new NotFoundException('결제 정보를 찾을 수 없습니다.');
+    const { status } = purchase;
+
+    const successedPurchaseStatus = [
+      'PAID',
+      'CANCELLED',
+      'PARTIAL_CANCELLED',
+      'VIRTUAL_ACCOUNT_ISSUED',
+    ];
+    if (successedPurchaseStatus.includes(status))
+      throw new NotAcceptableException('이미 결제가 완료되었습니다.');
+
+    const billing = await this.prismaService.workspaceBilling.findUnique({
+      where: { workspaceId },
+    });
+    if (!billing)
+      throw new NotFoundException(
+        '결제 정보를 찾을 수 없습니다. 결제 정보를 등록해주세요.',
+      );
+
+    try {
+      return await this.prismaService.$transaction(async (transaction) => {
+        const purchaseHistory = await transaction.purchaseHistory.update({
+          where: { id: purchaseId },
+          data: { status: PurchaseStatus.READY },
+          include: { workspace: true },
+        });
+
+        const { billingKey } = billing;
+        const {
+          id: paymentKey,
+          workspace: { name: workspaceName, id: workspaceId },
+          scheduledId,
+        } = purchaseHistory;
+
+        const purchasedAt = await this.portoneService.requestPayment(
+          paymentKey,
+          billingKey,
+          {
+            orderName: '스르륵 메세지 발송비용 청구',
+            ordererId: workspaceId.toString(),
+            ordererName: workspaceName,
+            amount: purchaseHistory.totalAmount,
+          },
+        );
+
+        if (scheduledId) {
+          try {
+            await this.portoneService.cancelScheduledPayment({
+              scheduleIds: [scheduledId],
+            });
+          } catch (error) {
+            this.logger.error(error);
+
+            await this.telegramService.sendMessage({
+              fetal: true,
+              context: PurchaseService.name,
+              workspaceId,
+              error,
+              message: `예약된 결제 취소에 실패했습니다. - ${purchaseId}`,
+            });
+
+            throw new NotAcceptableException(
+              '예약된 결제 취소에 실패했습니다.',
+            );
+          }
+        }
+
+        return await transaction.purchaseHistory.update({
+          where: { id: purchaseId },
+          data: { status: PurchaseStatus.PAID, purchasedAt },
+        });
+      });
+    } catch (error) {
+      await this.prismaService.purchaseHistory.update({
+        where: { id: purchaseId },
+        data: { status: PurchaseStatus.FAILED },
+      });
+
+      throw new InternalServerErrorException('결제 요청에 실패했습니다.');
+    }
   }
 
   public async findBilling(workspaceId: number) {
@@ -103,6 +196,33 @@ export class PurchaseService {
     return billing;
   }
 
+  public async deleteBilling(workspaceId: number) {
+    try {
+      return await this.prismaService.$transaction(async (transaction) => {
+        const billing = await transaction.workspaceBilling.findUnique({
+          where: { workspaceId },
+        });
+        if (!billing) return;
+
+        await this.portoneService.deleteBillingKey(billing.billingKey);
+        return await transaction.workspaceBilling.delete({
+          where: { id: billing.id },
+        });
+      });
+    } catch (err) {
+      this.logger.error(err);
+      await this.telegramService.sendMessage({
+        fetal: true,
+        workspaceId,
+        context: PurchaseService.name,
+        error: err,
+        message: `결제 정보 삭제에 실패했습니다.`,
+      });
+
+      throw new NotAcceptableException('결제 정보 삭제에 실패했습니다.');
+    }
+  }
+
   public async findPurchaseHistory(
     workspaceId: number,
     query: PurchaseHistoryQueryDto,
@@ -112,7 +232,6 @@ export class PurchaseService {
     return this.prismaService.purchaseHistory.findMany({
       where: {
         workspaceId,
-        status: { notIn: [PurchaseStatus.READY, PurchaseStatus.PAY_PENDING] },
       },
       skip,
       take,
@@ -124,7 +243,6 @@ export class PurchaseService {
     return this.prismaService.purchaseHistory.count({
       where: {
         workspaceId,
-        status: { notIn: [PurchaseStatus.READY, PurchaseStatus.PAY_PENDING] },
       },
     });
   }
@@ -173,14 +291,26 @@ export class PurchaseService {
       }, [])
       .sort((a, b) => a.price - b.price);
 
-    const amount =
-      purchasePrice.reduce((acc, cur) => acc + cur.price, 0) + defaultPrice;
+    const amount = purchasePrice.reduce((acc, cur) => acc + cur.price, 0);
+    if (amount === 0)
+      return {
+        freeTrialAvailable,
+        noPurchase: true,
+        contentSendCount: 0,
+        alimtalkSendCount: 0,
+        amount: 0,
+        discountAmount: 0,
+        totalAmount: 0,
+        ...config,
+      };
+
+    const defaultAmount = defaultPrice + amount;
 
     const discountAmount = freeTrialAvailable
-      ? amount
+      ? defaultAmount
       : purchasePrice.slice(0, 100).reduce((acc, cur) => acc + cur.price, 0);
 
-    const totalAmount = freeTrialAvailable ? 0 : amount - discountAmount;
+    const totalAmount = freeTrialAvailable ? 0 : defaultAmount - discountAmount;
 
     const contentSendCount = purchasePrice.filter(
       (item) => item.isContentSend,
@@ -189,9 +319,10 @@ export class PurchaseService {
 
     return {
       freeTrialAvailable,
+      noPurchase: false,
       contentSendCount,
       alimtalkSendCount,
-      amount,
+      amount: defaultAmount,
       discountAmount,
       totalAmount,
       ...config,
@@ -207,6 +338,11 @@ export class PurchaseService {
       where: { id: 1 },
     });
     if (!config) {
+      await this.telegramService.sendMessage({
+        fetal: true,
+        context: PurchaseService.name,
+        message: `설정 정보를 찾을 수 없습니다.`,
+      });
       throw new NotFoundException('설정 정보를 찾을 수 없습니다.');
     }
 
@@ -227,19 +363,9 @@ export class PurchaseService {
       });
 
       await this.prismaService.$transaction(async (transaction) => {
-        const billing = await transaction.workspaceBilling.findUnique({
-          where: { workspaceId: workspace.id },
-        });
-
-        if (!billing) {
-          this.logger.error(
-            `워크스페이스(${workspace.id})에 결제 정보가 없습니다.`,
-          );
-          return;
-        }
-
         const {
           freeTrialAvailable,
+          noPurchase,
           contentSendCount,
           alimtalkSendCount,
           amount,
@@ -264,23 +390,58 @@ export class PurchaseService {
           totalAmount,
         };
 
-        if (freeTrialAvailable) {
-          const purchase = await transaction.purchaseHistory.create({
+        if (totalAmount === 0 || freeTrialAvailable || noPurchase) {
+          return await transaction.purchaseHistory.create({
             data: {
               workspace: { connect: { id: workspace.id } },
-              billing: { connect: { id: billing.id } },
-              amount,
-              discountAmount: amount,
+              amount: 0,
+              discountAmount: 0,
               totalAmount: 0,
-              reason: '한달 무료체험',
+              reason: '스르륵 메세지 발송비용 청구',
               status: PurchaseStatus.PAID,
               recepit: {
                 create: createPurchaseRecepit,
               },
             },
           });
+        }
 
-          return purchase;
+        const billing = await transaction.workspaceBilling.findUnique({
+          where: { workspaceId: workspace.id },
+        });
+
+        if (!billing) {
+          await transaction.purchaseHistory.create({
+            data: {
+              workspace: { connect: { id: workspace.id } },
+              amount,
+              discountAmount,
+              totalAmount,
+              reason: '스르륵 메세지 발송비용 청구',
+              status: PurchaseStatus.FAILED,
+              recepit: {
+                create: {
+                  workspace: { connect: { id: workspace.id } },
+                  contentSendCount,
+                  alimtalkSendCount,
+                  alimtalkPrice: alimtalkSendPrice,
+                  contentPrice: contentSendPrice,
+                  amount,
+                  discountAmount,
+                  totalAmount,
+                },
+              },
+            },
+          });
+
+          await this.telegramService.sendMessage({
+            fetal: true,
+            context: PurchaseService.name,
+            workspaceId: workspace.id,
+            message: `결제 정보를 찾을 수 없습니다.`,
+          });
+
+          return;
         }
 
         const purchase = await transaction.purchaseHistory.create({
@@ -307,7 +468,7 @@ export class PurchaseService {
             paymentKey,
             billingKey,
             {
-              orderName: '스르륵 발송 후불 청구',
+              orderName: '스르륵 메세지 발송비용 청구',
               ordererId: workspaceId.toString(),
               ordererName: workspaceName,
               amount: totalAmount,
@@ -323,7 +484,18 @@ export class PurchaseService {
             },
           });
         } catch (error) {
-          this.logger.error(error);
+          this.prismaService.purchaseHistory.update({
+            where: { id: purchase.id },
+            data: { status: PurchaseStatus.FAILED },
+          });
+
+          await this.telegramService.sendMessage({
+            fetal: true,
+            context: PurchaseService.name,
+            error,
+            message: `결제 요청에 실패했습니다. - ${purchase.id}`,
+          });
+
           throw new NotAcceptableException('결제 요청에 실패했습니다.');
         }
       });
@@ -342,6 +514,7 @@ export class PurchaseService {
     });
 
     if (purchase.status === PurchaseStatus.PAID) return true;
+
     await this.prismaService.purchaseHistory.update({
       where: { id: purchase.id },
       data: { status: PurchaseStatus.PAID, purchasedAt: new Date() },
@@ -363,6 +536,13 @@ export class PurchaseService {
       await this.prismaService.purchaseHistory.update({
         where: { id: purchase.id },
         data: { status: PurchaseStatus.FAILED },
+      });
+
+      await this.telegramService.sendMessage({
+        context: PurchaseService.name,
+        workspaceId: purchase.workspaceId,
+        message: `재결제 시도 횟수를 초과했습니다. (RetryCountExceeded)`,
+        fetal: true,
       });
 
       // TODO: 메일 발송
@@ -397,6 +577,11 @@ export class PurchaseService {
         fetal: true,
       });
 
+      await this.prismaService.purchaseHistory.update({
+        where: { id: purchase.id },
+        data: { status: PurchaseStatus.FAILED },
+      });
+
       // TODO: 메일 발송
 
       return false;
@@ -428,6 +613,11 @@ export class PurchaseService {
         error: error,
         message: `결제 요청에 실패했습니다. (RetryPaymentFailed) - ${purchase.id}`,
         fetal: true,
+      });
+
+      await this.prismaService.purchaseHistory.update({
+        where: { id: purchase.id },
+        data: { status: PurchaseStatus.FAILED },
       });
 
       return true;

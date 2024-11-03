@@ -27,19 +27,21 @@ export class StoreCommand {
       include: { smartStoreCredentials: true },
     });
 
-    const sqsPayload = stores.map((store) => ({
-      id: store.id.toString() + new Date().getTime().toString(),
-      body: JSON.stringify({
-        payload: {
-          applicationId: store.smartStoreCredentials.applicationId,
-          applicationSecret: store.smartStoreCredentials.applicationSecret,
-          emailParseable: store.smartStoreCredentials.emailParseable,
-        },
-        lastSyncedAt: store.lastOrderSyncAt,
-        provider: 'SMARTSTORE',
-        storeId: store.id,
-      }),
-    }));
+    const sqsPayload = stores
+      .filter((store) => store.smartStoreCredentials)
+      .map((store) => ({
+        id: store.id.toString() + new Date().getTime().toString(),
+        body: JSON.stringify({
+          payload: {
+            applicationId: store.smartStoreCredentials?.applicationId,
+            applicationSecret: store.smartStoreCredentials?.applicationSecret,
+            emailParseable: store.smartStoreCredentials?.emailParseable,
+          },
+          lastSyncedAt: store.lastOrderSyncAt,
+          provider: 'SMARTSTORE',
+          storeId: store.id,
+        }),
+      }));
 
     console.log(`Sending ${sqsPayload.length} messages to SQS`);
     await this.sqsService.send('commerce', sqsPayload);

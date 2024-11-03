@@ -239,9 +239,13 @@ export class WorkspaceService {
     workspaceId: number,
   ): Promise<WorkspaceUser> {
     try {
-      return this.prismaService.workspaceUser.findUnique({
+      const user = await this.prismaService.workspaceUser.findUnique({
         where: { userId_workspaceId: { userId, workspaceId } },
       });
+      if (!user)
+        throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
+
+      return user;
     } catch (error) {
       this.logger.error(error);
       throw new InternalServerErrorException(

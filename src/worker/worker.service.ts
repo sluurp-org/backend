@@ -93,6 +93,9 @@ export class WorkerService {
       include: {
         messageTemplate: {
           include: {
+            kakaoTemplate: {
+              where: { status: KakaoTemplateStatus.APPROVED },
+            },
             workspace: {
               include: { workspaceUser: { include: { user: true } } },
             },
@@ -108,9 +111,9 @@ export class WorkerService {
       [KakaoTemplateStatus.UPLOADED]: '등록',
     };
 
-    const sendMessages = updatedTemplate.messageTemplate.map(
-      ({ id, workspaceId, workspace: { workspaceUser } }) =>
-        workspaceUser.map(({ user }) => {
+    const sendMessages = updatedTemplate.messageTemplate
+      .map(({ id, workspaceId, workspace }) =>
+        workspace?.workspaceUser.map(({ user }) => {
           return {
             to: user.phone,
             templateId: 'KA01TP241101140418410t4UY9irGh7E',
@@ -122,9 +125,11 @@ export class WorkerService {
             },
           };
         }),
-    );
+      )
+      .flat()
+      .filter((message) => message !== undefined);
 
-    await this.kakaoService.sendKakaoMessage(sendMessages.flat());
+    await this.kakaoService.sendKakaoMessage(sendMessages);
   }
 
   private extractTemplateStatus(message: string) {
@@ -198,7 +203,7 @@ export class WorkerService {
             return {
               event,
               success: true,
-              isUpdateDelivery: event.event.message.completeDelivery,
+              isUpdateDelivery: event?.event?.message.completeDelivery,
               updatedEventHistory,
             };
           }
@@ -224,7 +229,7 @@ export class WorkerService {
           return {
             event,
             success: false,
-            isUpdateDelivery: event.event.message.completeDelivery,
+            isUpdateDelivery: event?.event?.message.completeDelivery,
             updatedEventHistory,
           };
         });
@@ -263,7 +268,10 @@ export class WorkerService {
         }
       >
     >((acc, event) => {
+      if (!event.order) return acc;
+      if (!event.order.store.smartStoreCredentials) return acc;
       const storeId = event.order.store.id;
+
       if (!acc[storeId]) {
         acc[storeId] = {
           type: event.order.store.type,
@@ -286,10 +294,14 @@ export class WorkerService {
               '배송 처리는 스마트스토어에서만 가능합니다.',
             );
 
+          const productOrderIds = events
+            .map((event) => event?.order?.productOrderId)
+            .filter((id): id is string => id !== undefined);
+
           return await this.smartstoreService.completeDelivery(
             applicationId,
             applicationSecret,
-            events.map((event) => event.order.productOrderId),
+            productOrderIds || [],
           );
         },
       ),

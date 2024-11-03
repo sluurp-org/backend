@@ -15,12 +15,12 @@ export class AwsService {
     this.s3 = new S3Client({ region: 'ap-northeast-2' });
   }
 
-  public async createUploadPresignedUrl(key: string, contentType: string) {
+  public async createUploadPresignedUrl(key: string, contentType?: string) {
     const bucketName = this.configService.get<string>('CONTENT_S3_BUCKET_NAME');
     const command = new PutObjectCommand({
       Bucket: bucketName,
       Key: key,
-      ContentType: contentType,
+      ContentType: contentType || 'application/octet-stream',
     });
 
     return getSignedUrl(this.s3, command, { expiresIn: 3600 });
@@ -29,7 +29,7 @@ export class AwsService {
   public async createDownloadPresignedUrl(
     key: string,
     name: string,
-    extension: string,
+    extension: string | null,
   ) {
     const bucketName = this.configService.get<string>('CONTENT_S3_BUCKET_NAME');
     const fileName = `${name}.${extension}`;

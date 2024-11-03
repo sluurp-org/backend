@@ -18,7 +18,7 @@ export class PortoneService {
     private readonly httpService: HttpService,
     private readonly configService: ConfigService,
   ) {
-    this.channelKey = this.configService.get('PORTONE_CHANNEL_KEY');
+    this.channelKey = this.configService.getOrThrow('PORTONE_CHANNEL_KEY');
   }
 
   public async createBillingKey(
@@ -134,7 +134,7 @@ export class PortoneService {
       return payment.paidAt;
     } catch (error) {
       if (isAxiosError(error)) {
-        console.log(error.response.data);
+        console.log(error?.response?.data);
       }
 
       throw new InternalServerErrorException('결제 요청에 실패했습니다.');
@@ -203,11 +203,9 @@ export class PortoneService {
   }
 
   public async cancelScheduledPayment({
-    billingKey,
     scheduleIds,
   }: {
-    billingKey?: string;
-    scheduleIds?: string[];
+    scheduleIds: string[];
   }) {
     try {
       const paymentSchedules = await Promise.all(
@@ -221,7 +219,6 @@ export class PortoneService {
       const cancelScheduledPayment = await firstValueFrom(
         this.httpService.delete(`/payment-schedules`, {
           data: {
-            billingKey,
             scheduleIds: paymentScheduleIds,
           },
         }),

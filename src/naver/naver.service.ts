@@ -11,10 +11,13 @@ export class NaverService {
   ) {}
 
   private state = 'sluurp';
-  private apiURL = this.configService.get<string>('NAVER_API_URL');
-  private clientId = this.configService.get<string>('NAVER_CLIENT_ID');
-  private clientSecret = this.configService.get<string>('NAVER_CLIENT_SECRET');
-  private callbackUrl = this.configService.get<string>('NAVER_CALLBACK_URL');
+  private apiURL = this.configService.getOrThrow<string>('NAVER_API_URL');
+  private clientId = this.configService.getOrThrow<string>('NAVER_CLIENT_ID');
+  private clientSecret = this.configService.getOrThrow<string>(
+    'NAVER_CLIENT_SECRET',
+  );
+  private callbackUrl =
+    this.configService.getOrThrow<string>('NAVER_CALLBACK_URL');
 
   public getAuthorizationUrl() {
     const url = new URL(this.apiURL + '/authorize');

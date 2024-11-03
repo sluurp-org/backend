@@ -5,7 +5,8 @@ import { Context, Telegraf } from 'telegraf';
 
 @Injectable()
 export class TelegramService {
-  private readonly CHAT_ID: string = this.configService.get('TELEGRAM_CHAT_ID');
+  private readonly CHAT_ID: string =
+    this.configService.getOrThrow('TELEGRAM_CHAT_ID');
   private readonly logger = new Logger(TelegramService.name);
 
   constructor(

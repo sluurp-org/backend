@@ -171,7 +171,7 @@ export class EventService {
 
         const contents = await this.contentService.findAvailableContent(
           contentGroupId,
-          oneTime ? quantity : 1,
+          oneTime ? quantity || 1 : 1,
           transaction,
         );
 
@@ -183,7 +183,9 @@ export class EventService {
         }
 
         const expireAt = new Date();
-        expireAt.setMinutes(expireAt.getMinutes() + expireMinute);
+        if (expireMinute) {
+          expireAt.setMinutes(expireAt.getMinutes() + expireMinute);
+        }
 
         return {
           messageTemplate: { connect: { id: messageId } },
@@ -309,8 +311,11 @@ export class EventService {
     variables: Variables[],
   ): Prisma.EventHistoryUpdateInput {
     const { messageTemplate, id: eventHistoryId } = eventHistory;
-    const { kakaoTemplate } = messageTemplate;
+    if (!messageTemplate?.kakaoTemplate) {
+      throw new Error('메세지가 존재하지 않습니다.');
+    }
 
+    const { kakaoTemplate } = messageTemplate;
     const { product, productVariant, store, orderAt, ...orderRest } = order;
 
     const variableBody = {

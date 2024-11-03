@@ -49,13 +49,13 @@ import { TelegramModule } from './telegram/telegram.module';
         producers: [
           {
             name: 'commerce',
-            region: configService.get('AWS_REGION'),
-            queueUrl: configService.get('COMMERCE_SQS_QUEUE_URL'),
+            region: configService.getOrThrow('AWS_REGION'),
+            queueUrl: configService.getOrThrow('COMMERCE_SQS_QUEUE_URL'),
           },
           {
             name: 'event',
-            region: configService.get('AWS_REGION'),
-            queueUrl: configService.get('EVENT_SQS_QUEUE_URL'),
+            region: configService.getOrThrow('AWS_REGION'),
+            queueUrl: configService.getOrThrow('EVENT_SQS_QUEUE_URL'),
           },
         ],
       }),
@@ -64,7 +64,7 @@ import { TelegramModule } from './telegram/telegram.module';
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: async (configService: ConfigService) => ({
-        token: configService.get('TELEGRAM_BOT_TOKEN'),
+        token: configService.getOrThrow('TELEGRAM_BOT_TOKEN'),
       }),
     }),
     KakaoModule,

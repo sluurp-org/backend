@@ -38,6 +38,7 @@ export class UsersService {
       const user = await this.prismaService.user.findUnique({
         where: { id: userId, deletedAt: null },
       });
+      if (!user) throw new NotFoundException('사용자 정보가 없습니다.');
 
       return user;
     } catch (error) {
@@ -53,6 +54,7 @@ export class UsersService {
       const user = await this.prismaService.user.findUnique({
         where: { loginId, deletedAt: null },
       });
+      if (!user) throw new NotFoundException('사용자 정보가 없습니다.');
 
       return user;
     } catch (error) {
@@ -79,7 +81,11 @@ export class UsersService {
           },
         },
       });
-    if (recentPhoneVerification?.expiredAt > new Date())
+
+    if (
+      recentPhoneVerification &&
+      recentPhoneVerification?.expiredAt > new Date()
+    )
       throw new NotAcceptableException(
         `${differenceInSeconds(recentPhoneVerification.expiredAt, new Date())}초 후 다시 시도해주세요.`,
       );
@@ -289,7 +295,7 @@ export class UsersService {
     }
   }
 
-  public async updateUserRefreshToken(userId: number, refreshToken: string) {
+  public async updateUserRefreshToken(userId: number, refreshToken?: string) {
     try {
       return await this.prismaService.user.update({
         where: { id: userId },
@@ -348,7 +354,9 @@ export class UsersService {
   }
 
   public hashChannel(userId: number): string {
-    const secretKey = this.configService.get<string>('CHANNELTALK_SECRET_KEY');
+    const secretKey = this.configService.getOrThrow<string>(
+      'CHANNELTALK_SECRET_KEY',
+    );
 
     const hash = crypto
       .createHmac('sha256', Buffer.from(secretKey, 'hex'))

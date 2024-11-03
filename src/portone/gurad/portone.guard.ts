@@ -13,7 +13,9 @@ export class PortoneGuard {
     const request = context.switchToHttp().getRequest();
 
     const { body, headers } = request;
-    const secret = this.configService.get<string>('PORTONE_WEBHOOK_SECRET');
+    const secret = this.configService.getOrThrow<string>(
+      'PORTONE_WEBHOOK_SECRET',
+    );
 
     try {
       await PortOne.Webhook.verify(secret, JSON.stringify(body), headers);

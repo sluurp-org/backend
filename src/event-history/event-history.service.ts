@@ -41,7 +41,7 @@ export class EventHistoryService {
         error: '만료된 콘텐츠입니다.',
       };
 
-    if (downloadLimit > 0 && downloadCount >= downloadLimit)
+    if (downloadLimit && downloadLimit > 0 && downloadCount >= downloadLimit)
       return {
         downloadAvailable: false,
         error: '다운로드 횟수가 초과되었습니다.',
@@ -76,7 +76,7 @@ export class EventHistoryService {
         },
       },
     });
-    if (!eventHistory)
+    if (!eventHistory || !eventHistory.order)
       throw new NotFoundException('존재하지 않는 주문 입니다.');
 
     const contents = await Promise.all(
@@ -112,10 +112,10 @@ export class EventHistoryService {
         },
       });
 
-    if (!contentConnection)
+    if (!contentConnection || !contentConnection.content)
       throw new NotFoundException('존재하지 않는 콘텐츠 입니다.');
 
-    const { error, content } = await this.validateContent(contentConnection);
+    const { error } = await this.validateContent(contentConnection);
     if (error) throw new ForbiddenException(error);
 
     const {
@@ -125,11 +125,11 @@ export class EventHistoryService {
       extension,
       contentGroupId,
       type,
-    } = content;
+    } = contentConnection.content;
 
     if (type === ContentType.FILE) {
       const key = `${contentGroupId}/${contentId}`;
-      const encodedName = encodeURIComponent(name);
+      const encodedName = encodeURIComponent(name || '주문 파일');
       const url = await this.awsService.createDownloadPresignedUrl(
         key,
         encodedName,
@@ -151,7 +151,7 @@ export class EventHistoryService {
         },
       },
     });
-    if (!eventHistory)
+    if (!eventHistory || !eventHistory.order)
       throw new NotFoundException('존재하지 않는 주문 입니다.');
 
     const {
@@ -178,7 +178,7 @@ export class EventHistoryService {
         },
       },
     });
-    if (!eventHistory)
+    if (!eventHistory || !eventHistory.order)
       throw new NotFoundException('존재하지 않는 주문 입니다.');
 
     const {

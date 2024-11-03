@@ -38,8 +38,8 @@ export class KakaoService {
   private provisionKakaoService() {
     try {
       this.solapiMessageService = new SolapiMessageService(
-        this.configService.get<string>('SOLAPI_API_KEY'),
-        this.configService.get<string>('SOLAPI_API_SECRET'),
+        this.configService.getOrThrow<string>('SOLAPI_API_KEY'),
+        this.configService.getOrThrow<string>('SOLAPI_API_SECRET'),
       );
       this.logger.log('Kakao Service is provisioned');
     } catch (error) {
@@ -190,7 +190,7 @@ export class KakaoService {
       | 'imageId'
     >,
   ) {
-    const channelGroupId = this.configService.get<string>(
+    const channelGroupId = this.configService.getOrThrow<string>(
       'SOLAPI_CHANNEL_GROUP_ID',
     );
     const { imageId } = dto;
@@ -243,7 +243,7 @@ export class KakaoService {
   ) {
     let messageType: KakaoAlimtalkTemplateMessageType = 'BA';
 
-    const isChannelAddButton = !!dto.buttons.find(
+    const isChannelAddButton = !!dto.buttons?.find(
       (item) => item.buttonType === 'AC',
     );
 
@@ -346,7 +346,11 @@ export class KakaoService {
       );
 
     const dimensions = sizeOf(file.buffer);
-    if (dimensions.width / dimensions.height !== 2)
+    if (
+      dimensions.height &&
+      dimensions.width &&
+      dimensions.width / dimensions.height !== 2
+    )
       throw new BadRequestException('이미지 파일 비율이 2:1이 아닙니다.');
 
     // 이미지 파일인지 확인
@@ -384,8 +388,9 @@ export class KakaoService {
   }
 
   private generateAccessToken(): string {
-    const apiKey = this.configService.get<string>('SOLAPI_API_KEY');
-    const apiSecret = this.configService.get<string>('SOLAPI_API_SECRET');
+    const apiKey = this.configService.getOrThrow<string>('SOLAPI_API_KEY');
+    const apiSecret =
+      this.configService.getOrThrow<string>('SOLAPI_API_SECRET');
 
     const currentDate = new Date().toISOString();
     const saltLength = Math.floor(Math.random() * (64 - 12 + 1) + 12);
@@ -406,7 +411,7 @@ export class KakaoService {
       variables: any;
     }[],
   ) {
-    const from = this.configService.get('SOLAPI_SENDER');
+    const from = this.configService.getOrThrow('SOLAPI_SENDER');
 
     try {
       await this.solapiMessageService.send(
@@ -414,7 +419,7 @@ export class KakaoService {
           from,
           to,
           kakaoOptions: {
-            pfId: this.configService.get('SOLAPI_PFID'),
+            pfId: this.configService.getOrThrow('SOLAPI_PFID'),
             templateId,
             variables,
           },

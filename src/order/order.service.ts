@@ -71,7 +71,7 @@ export class OrderService {
         '시작일자가 종료일자보다 늦을 수 없습니다.',
       );
 
-    if (differenceInDays(endDate, startDate) > 60)
+    if (startDate && endDate && differenceInDays(endDate, startDate) > 60)
       throw new BadRequestException('조회 기간은 60일 이내로 설정 가능합니다.');
 
     return this.prismaService.order.findMany({
@@ -157,13 +157,13 @@ export class OrderService {
 
     const order = await this.prismaService.order.create({
       data: {
+        ...dto,
         orderId: randomUUID(),
         productOrderId: randomUUID(),
         workspaceId,
         orderAt: orderAt || new Date(),
         receiverName: receiverName || ordererName,
         receiverPhone: receiverPhone || ordererPhone,
-        ...dto,
       },
       include: {
         product: true,
@@ -359,11 +359,11 @@ export class OrderService {
         ...data,
       },
       create: {
+        ...data,
         workspaceId,
         storeId,
         orderId,
         productOrderId,
-        ...data,
       },
       include: {
         store: true,
@@ -377,7 +377,7 @@ export class OrderService {
     workspaceId: number,
     disableGlobalEvent: boolean,
     productId: number | null,
-    productVariantId: number | null,
+    productVariantId: number | undefined | null,
     type: OrderStatus,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
@@ -386,19 +386,11 @@ export class OrderService {
         workspaceId,
         type,
         OR: [
-          {
-            product: { id: productId, deletedAt: null },
-          },
-          {
-            product: { id: productId, deletedAt: null },
-            productVariant: productVariantId
-              ? {
-                  id: productVariantId,
-                  deletedAt: null,
-                }
-              : null,
-          },
-          !disableGlobalEvent && { productVariant: null, product: null },
+          ...(productId ? [{ productId }] : []),
+          ...(productVariantId ? [{ productVariantId }] : []),
+          ...(disableGlobalEvent
+            ? [{ productId: null, productVariantId: null }]
+            : []),
         ],
         message: {
           readonly: false,
@@ -448,7 +440,7 @@ export class OrderService {
       ? await this.findOrCreateProductVariant(
           product.id,
           productVariantId,
-          productVariantName,
+          productVariantName || '-',
           transaction,
         )
       : null;

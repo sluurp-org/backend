@@ -8,12 +8,7 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
-import {
-  KakaoTemplateStatus,
-  MessageTarget,
-  Prisma,
-  Variables,
-} from '@prisma/client';
+import { KakaoTemplateStatus, MessageTarget, Prisma } from '@prisma/client';
 import {
   CreateKakaoTemplateBodyDto,
   KakaoTemplateButton,
@@ -75,7 +70,11 @@ export class MessageService {
         contentGroup: true,
       },
     });
-    const comments = [];
+    if (!message) throw new NotFoundException('메시지가 존재하지 않습니다.');
+    if (!message.kakaoTemplate)
+      throw new NotFoundException('템플릿이 존재하지 않습니다.');
+
+    const comments: string[] = [];
     if (
       !message.isGlobal &&
       message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED
@@ -85,7 +84,7 @@ export class MessageService {
       );
 
       comments.push(
-        ...kakaoTemplate.comments
+        ...(kakaoTemplate.comments ?? [])
           .filter((c) => c.isAdmin)
           .map((c) => c.content),
       );
@@ -113,6 +112,9 @@ export class MessageService {
         '커스텀 수신자 타입은 전화번호 입력이 필요합니다.',
       );
     }
+
+    if (!kakaoTemplate)
+      throw new BadRequestException('메세지를 생성해야 합니다.');
 
     return this.prismaService.$transaction(async (tx) => {
       const message = await tx.messageTemplate.create({
@@ -194,6 +196,9 @@ export class MessageService {
     }
 
     const { kakaoTemplate } = message;
+    if (!kakaoTemplate)
+      throw new BadRequestException('메시지 템플릿이 존재하지 않습니다.');
+
     return this.prismaService.$transaction(async (tx) => {
       await this.kakaoService.requestKakaoTemplateInspection(
         kakaoTemplate.templateId,
@@ -214,6 +219,8 @@ export class MessageService {
     if (!message) {
       throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
     }
+    if (!message.kakaoTemplate)
+      throw new BadRequestException('메시지 템플릿이 존재하지 않습니다.');
 
     if (message.kakaoTemplate.status !== KakaoTemplateStatus.PENDING) {
       throw new NotAcceptableException('검수중인 템플릿이 아닙니다.');
@@ -285,6 +292,9 @@ export class MessageService {
     }>,
     dto: UpdateKakaoTemplateBodyDto,
   ) {
+    if (!message.kakaoTemplate)
+      throw new BadRequestException('메시지 템플릿이 존재하지 않습니다.');
+
     if (
       message.kakaoTemplate.status === KakaoTemplateStatus.APPROVED ||
       message.kakaoTemplate.status === KakaoTemplateStatus.PENDING
@@ -295,7 +305,7 @@ export class MessageService {
     }
 
     const { content, buttons, categoryCode, extra, imageId, imageUrl } = dto;
-    const kakaoTemplateButtons = buttons.map((button) =>
+    const kakaoTemplateButtons = buttons?.map((button) =>
       this.mapKakaoButton(button),
     );
 
@@ -324,12 +334,15 @@ export class MessageService {
     if (!message) {
       throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
     }
+    if (!message.kakaoTemplate)
+      throw new BadRequestException('메시지 템플릿이 존재하지 않습니다.');
 
     return this.prismaService.$transaction(async (tx) => {
       await tx.messageTemplate.delete({ where: { id: messageId } });
-      await this.kakaoService.deleteKakaoTemplate(
-        message.kakaoTemplate.templateId,
-      );
+      message.kakaoTemplate?.templateId &&
+        (await this.kakaoService.deleteKakaoTemplate(
+          message.kakaoTemplate?.templateId,
+        ));
 
       return message;
     });

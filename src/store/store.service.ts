@@ -11,7 +11,6 @@ import { FindStoreQueryDto } from './dto/req/find-store-query.dto';
 import { CreateStoreBodyDto } from './dto/req/create-store-body.dto';
 import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
 import { SmartstoreService } from 'src/smartstore/smartstore.service';
-import { StoreDto } from './dto/res/store.dto';
 import { SqsService } from '@ssut/nestjs-sqs';
 import { differenceInMinutes } from 'date-fns';
 
@@ -52,10 +51,7 @@ export class StoreService {
     });
   }
 
-  public async findOne(
-    storeId: number,
-    workspaceId: number,
-  ): Promise<StoreDto> {
+  public async findOne(storeId: number, workspaceId: number) {
     const store = await this.prismaService.store.findUnique({
       where: { id: storeId, workspaceId, deletedAt: null },
       include: { smartStoreCredentials: true },
@@ -91,6 +87,13 @@ export class StoreService {
       throw new BadRequestException(
         '스마트스토어 타입의 스토어는 스마트스토어 정보를 입력해야 합니다.',
       );
+
+    if (
+      !smartStoreCredentials?.applicationId &&
+      !smartStoreCredentials?.applicationSecret
+    ) {
+      throw new BadRequestException('애플리케이션 ID와 시크릿을 입력해주세요.');
+    }
 
     const storeData: Prisma.StoreCreateInput = {
       ...rest,
@@ -146,6 +149,11 @@ export class StoreService {
 
     if (smartStoreCredentials && store.smartStoreCredentials) {
       const { applicationId, applicationSecret } = smartStoreCredentials;
+      if (!applicationId || !applicationSecret)
+        throw new BadRequestException(
+          '애플리케이션 ID와 시크릿을 입력해주세요.',
+        );
+
       const storeInfo = await this.smartstoreService.getStoreInfo(
         applicationId,
         applicationSecret,
@@ -192,9 +200,10 @@ export class StoreService {
         include: { smartStoreCredentials: true },
       });
 
-      await tx.smartStoreCredentials.delete({
-        where: { id: store.smartStoreCredentials.id },
-      });
+      store.smartStoreCredentials &&
+        (await tx.smartStoreCredentials.delete({
+          where: { id: store.smartStoreCredentials.id },
+        }));
 
       return deletedStore;
     });
@@ -373,19 +382,21 @@ export class StoreService {
       include: { smartStoreCredentials: true },
     });
 
-    const sqsPayload = stores.map((store) => ({
-      id: store.id.toString() + new Date().getTime().toString(),
-      body: JSON.stringify({
-        payload: {
-          applicationId: store.smartStoreCredentials.applicationId,
-          applicationSecret: store.smartStoreCredentials.applicationSecret,
-          emailParseable: store.smartStoreCredentials.emailParseable,
-        },
-        lastSyncedAt: store.lastOrderSyncAt,
-        provider: 'SMARTSTORE',
-        storeId: store.id,
-      }),
-    }));
+    const sqsPayload = stores
+      .filter((store) => store.smartStoreCredentials !== null)
+      .map((store) => ({
+        id: store.id.toString() + new Date().getTime().toString(),
+        body: JSON.stringify({
+          payload: {
+            applicationId: store.smartStoreCredentials?.applicationId,
+            applicationSecret: store.smartStoreCredentials?.applicationSecret,
+            emailParseable: store.smartStoreCredentials?.emailParseable,
+          },
+          lastSyncedAt: store.lastOrderSyncAt,
+          provider: 'SMARTSTORE',
+          storeId: store.id,
+        }),
+      }));
 
     console.log(`Sending ${sqsPayload.length} messages to SQS`);
     await this.sqsService.send('commerce', sqsPayload);

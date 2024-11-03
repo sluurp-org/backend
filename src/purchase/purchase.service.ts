@@ -95,7 +95,14 @@ export class PurchaseService {
           id: paymentKey,
           workspace: { name: workspaceName, id: workspaceId },
           scheduledId,
+          totalAmount,
         } = purchaseHistory;
+
+        if (!totalAmount || totalAmount === 0)
+          return await transaction.purchaseHistory.update({
+            where: { id: purchaseId },
+            data: { status: PurchaseStatus.PAID, purchasedAt: new Date() },
+          });
 
         const purchasedAt = await this.portoneService.requestPayment(
           paymentKey,
@@ -104,7 +111,7 @@ export class PurchaseService {
             orderName: '스르륵 메세지 발송비용 청구',
             ordererId: workspaceId.toString(),
             ordererName: workspaceName,
-            amount: purchaseHistory.totalAmount,
+            amount: totalAmount,
           },
         );
 
@@ -563,6 +570,26 @@ export class PurchaseService {
       },
     });
 
+    if (!purchase.billingId) {
+      this.logger.error('결제 정보를 찾을 수 없습니다.');
+
+      await this.telegramService.sendMessage({
+        context: PurchaseService.name,
+        workspaceId: purchase.workspaceId,
+        message: `결제 정보를 찾을 수 없습니다. (BillingKeyNotFound)`,
+        fetal: true,
+      });
+
+      await this.prismaService.purchaseHistory.update({
+        where: { id: purchase.id },
+        data: { status: PurchaseStatus.FAILED },
+      });
+
+      // TODO: 메일 발송
+
+      return false;
+    }
+
     const workspaceBilling =
       await this.prismaService.workspaceBilling.findUnique({
         where: { id: purchase.billingId },
@@ -585,6 +612,15 @@ export class PurchaseService {
       // TODO: 메일 발송
 
       return false;
+    }
+
+    if (!purchase.totalAmount || purchase.totalAmount === 0) {
+      await this.prismaService.purchaseHistory.update({
+        where: { id: purchase.id },
+        data: { status: PurchaseStatus.PAID, purchasedAt: new Date() },
+      });
+
+      return true;
     }
 
     try {

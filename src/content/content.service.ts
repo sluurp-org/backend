@@ -242,9 +242,7 @@ export class ContentService {
       });
     }
 
-    if (text !== undefined) {
-      throw new BadRequestException('수정할 값이 없습니다.');
-    }
+    if (!text) throw new BadRequestException('수정할 값이 없습니다.');
 
     this.validateContentGroupType(group.type, text);
     return this.prismaService.content.update({
@@ -281,7 +279,7 @@ export class ContentService {
 
     const key = `${contentGroupId}/${content.id}`;
     const { name, extension } = content;
-    const encodedName = encodeURIComponent(name);
+    const encodedName = encodeURIComponent(name || '주문 파일');
 
     return this.awsService.createDownloadPresignedUrl(
       key,

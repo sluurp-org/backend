@@ -24,7 +24,7 @@ export class SmartstoreService {
 
   private async handleCommerceError(error: unknown, applicationId: string) {
     if (!isAxiosError(error)) return;
-    if (error.response.status !== 401) return;
+    if (error?.response?.status !== 401) return;
 
     await this.prismaService.store.updateMany({
       where: { smartStoreCredentials: { applicationId } },
@@ -133,7 +133,7 @@ export class SmartstoreService {
       const size = 500; // 고정 사이즈
       let page = 0;
       let totalPages = 0;
-      const allProducts = [];
+      const allProducts: Content[] = [];
 
       do {
         const channelResponse = await firstValueFrom(
@@ -214,7 +214,12 @@ export class SmartstoreService {
           },
         },
       });
-      if (cachedToken && cachedToken.expiresAt > new Date()) {
+
+      if (
+        cachedToken?.expiresAt &&
+        cachedToken.accessToken &&
+        cachedToken.expiresAt > new Date()
+      ) {
         const isValid = await this.validateToken(cachedToken.accessToken);
         if (isValid) return cachedToken.accessToken;
       }
@@ -275,14 +280,14 @@ export class SmartstoreService {
           '일시적인 문제가 발생하였습니다. 네이버 커머스 권한 정보를 확인하세요.',
         );
       }
-      if (error.response.status === 500)
+      if (error?.response?.status === 500)
         throw new InternalServerErrorException(
           '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
         );
-      if (error.response.status === 403)
+      if (error?.response?.status === 403)
         throw new ForbiddenException('유효하지 않는 접근 권한입니다.');
 
-      if (error.response.status === 400)
+      if (error?.response?.status === 400)
         throw new BadRequestException('유효하지 않은 입력 정보입니다.');
 
       throw new InternalServerErrorException(

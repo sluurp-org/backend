@@ -90,23 +90,25 @@ model Workspace {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  lastPurchaseAt DateTime? @default(now())
-  nextPurchaseAt DateTime?
+  lastPurchaseAt DateTime @default(now())
+  nextPurchaseAt DateTime
 
-  workspaceUser    WorkspaceUser[]
-  store            Store[]
-  product          Product[]
-  order            Order[]
-  content          Content[]
-  event            Event[]
-  kakaoCredential  KakaoCredential?
-  messageTemplate  MessageTemplate[]
-  orderHistory     OrderHistory[]
-  contentGroup     ContentGroup[]
-  purchaseHistory  PurchaseHistory[]
-  workspaceBilling WorkspaceBilling?
-  eventHistory     EventHistory[]
-  Recepit          Recepit[]
+  workspaceUser              WorkspaceUser[]
+  store                      Store[]
+  product                    Product[]
+  order                      Order[]
+  content                    Content[]
+  event                      Event[]
+  kakaoCredential            KakaoCredential?
+  messageTemplate            MessageTemplate[]
+  orderHistory               OrderHistory[]
+  contentGroup               ContentGroup[]
+  purchaseHistory            PurchaseHistory[]
+  workspaceBilling           WorkspaceBilling?
+  eventHistory               EventHistory[]
+  Recepit                    Recepit[]
+  DailyWorkspaceStatistics   DailyWorkspaceStatistics[]
+  MonthlyWorkspaceStatistics MonthlyWorkspaceStatistics[]
 }
 
 model WorkspaceBilling {
@@ -142,9 +144,11 @@ model Store {
   updatedAt DateTime  @default(now()) @updatedAt
   deletedAt DateTime?
 
-  product      Product[]
-  order        Order[]
-  orderHistory OrderHistory[]
+  product                Product[]
+  order                  Order[]
+  orderHistory           OrderHistory[]
+  monthlyStoreStatistics MonthlyStoreStatistics[]
+  dailyStoreStatistics   DailyStoreStatistics[]
 }
 
 enum StoreType {
@@ -597,4 +601,76 @@ enum PurchaseStatus {
   PAY_PENDING
   READY
   VIRTUAL_ACCOUNT_ISSUED
+}
+
+model DailyStoreStatistics {
+  id Int @id @default(autoincrement())
+
+  storeId        Int
+  orderDate      DateTime
+  totalOrders    Int
+  totalQuantity  Int
+  totalSales     Int
+  totalRefund    Int
+  totalCancelled Int
+
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, orderDate])
+}
+
+model MonthlyStoreStatistics {
+  id Int @id @default(autoincrement())
+
+  storeId        Int
+  orderMonth     DateTime
+  totalOrders    Int
+  totalQuantity  Int
+  totalSales     Int
+  totalRefund    Int
+  totalCancelled Int
+
+  createdAt DateTime @default(now())
+
+  store Store @relation(fields: [storeId], references: [id])
+
+  @@unique([storeId, orderMonth])
+}
+
+model DailyWorkspaceStatistics {
+  id Int @id @default(autoincrement())
+
+  workspaceId    Int
+  orderDate      DateTime
+  totalOrders    Int
+  totalQuantity  Int
+  totalSales     Int
+  totalRefund    Int
+  totalCancelled Int
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, orderDate])
+}
+
+model MonthlyWorkspaceStatistics {
+  id Int @id @default(autoincrement())
+
+  workspaceId    Int
+  orderMonth     DateTime
+  totalOrders    Int
+  totalQuantity  Int
+  totalSales     Int
+  totalRefund    Int
+  totalCancelled Int
+
+  createdAt DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  @@unique([workspaceId, orderMonth])
 }

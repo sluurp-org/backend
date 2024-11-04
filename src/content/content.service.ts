@@ -74,7 +74,7 @@ export class ContentService {
 
   public async deleteGroup(workspaceId: number, contentId: number) {
     return await this.prismaService.$transaction(async (tx) => {
-      await tx.messageTemplate.updateMany({
+      await tx.message.updateMany({
         where: { workspaceId, contentGroupId: contentId },
         data: { contentGroupId: null },
       });

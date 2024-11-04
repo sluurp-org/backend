@@ -326,7 +326,7 @@ export class KakaoService {
         this.logger.error(error);
       }
 
-      await tx.messageTemplate.deleteMany({
+      await tx.message.deleteMany({
         where: {
           workspaceId,
         },

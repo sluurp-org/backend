@@ -1,9 +1,0 @@
-/*
-  Warnings:
-
-  - You are about to drop the column `name` on the `Event` table. All the data in the column will be lost.
-
-*/
--- AlterTable
-ALTER TABLE `Event` DROP COLUMN `name`,
-    ADD COLUMN `completeDelivery` BOOLEAN NOT NULL DEFAULT false;

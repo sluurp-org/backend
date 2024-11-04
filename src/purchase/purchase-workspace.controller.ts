@@ -1,4 +1,4 @@
-import { Body, Get, Param, Post, Query } from '@nestjs/common';
+import { Body, Delete, Get, Param, Post, Query } from '@nestjs/common';
 import { PurchaseService } from './purchase.service';
 import { WorkspaceAuth } from 'src/workspace/decorator/workspace-auth.decorator';
 import { Workspace, WorkspaceRole } from '@prisma/client';
@@ -68,6 +68,21 @@ export class PurchaseWorkspaceController {
     @Body() dto: CreateBillingBodyDto,
   ) {
     return this.purchaseService.upsertBilling(workspaceId, dto);
+  }
+
+  @Delete('billing')
+  @ApiOperation({
+    summary: '빌링키 삭제',
+    description: '워크스페이스의 빌링키를 삭제합니다.',
+  })
+  @WorkspaceAuth([WorkspaceRole.OWNER])
+  @Serialize(BillingDto)
+  @ApiResponse({
+    status: 200,
+    type: BillingDto,
+  })
+  public async deleteBilling(@ReqWorkspace() { id: workspaceId }: Workspace) {
+    return this.purchaseService.deleteBilling(workspaceId);
   }
 
   @Get('history')

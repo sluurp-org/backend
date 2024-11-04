@@ -34,6 +34,7 @@ import { MailModule } from './mail/mail.module';
 import { EventHistoryModule } from './event-history/event-history.module';
 import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
 import { TelegramModule } from './telegram/telegram.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -87,6 +88,7 @@ import { TelegramModule } from './telegram/telegram.module';
     EventHistoryModule,
     EventHistoryWorkspaceModule,
     TelegramModule,
+    AnalyticsModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

@@ -74,7 +74,7 @@ export class PurchaseService {
     if (successedPurchaseStatus.includes(status))
       throw new NotAcceptableException('이미 결제가 완료되었습니다.');
 
-    const billing = await this.prismaService.workspaceBilling.findUnique({
+    const billing = await this.prismaService.billing.findUnique({
       where: { workspaceId },
     });
     if (!billing)
@@ -108,7 +108,7 @@ export class PurchaseService {
           paymentKey,
           billingKey,
           {
-            orderName: '스르륵 메세지 발송비용 청구',
+            orderName: '스르륵 메시지 발송비용 청구',
             ordererId: workspaceId.toString(),
             ordererName: workspaceName,
             amount: totalAmount,
@@ -148,12 +148,20 @@ export class PurchaseService {
         data: { status: PurchaseStatus.FAILED },
       });
 
+      await this.telegramService.sendMessage({
+        fetal: true,
+        context: PurchaseService.name,
+        workspaceId,
+        error,
+        message: `결제 요청에 실패했습니다. - ${purchaseId}`,
+      });
+
       throw new InternalServerErrorException('결제 요청에 실패했습니다.');
     }
   }
 
   public async findBilling(workspaceId: number) {
-    return this.prismaService.workspaceBilling.findUnique({
+    return this.prismaService.billing.findUnique({
       where: { workspaceId },
     });
   }
@@ -165,7 +173,7 @@ export class PurchaseService {
     if (!workspace)
       throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
 
-    const billingExists = await this.prismaService.workspaceBilling.findUnique({
+    const billingExists = await this.prismaService.billing.findUnique({
       where: { workspaceId },
     });
     if (billingExists)
@@ -192,7 +200,7 @@ export class PurchaseService {
 
     const maskedCardNumber = dto.number.replace(/\d{4}(?=\d{4})/g, '**** ');
 
-    const billing = await this.prismaService.workspaceBilling.create({
+    const billing = await this.prismaService.billing.create({
       data: {
         workspaceId,
         billingKey: billingKeyResponse,
@@ -206,13 +214,13 @@ export class PurchaseService {
   public async deleteBilling(workspaceId: number) {
     try {
       return await this.prismaService.$transaction(async (transaction) => {
-        const billing = await transaction.workspaceBilling.findUnique({
+        const billing = await transaction.billing.findUnique({
           where: { workspaceId },
         });
         if (!billing) return;
 
         await this.portoneService.deleteBillingKey(billing.billingKey);
-        return await transaction.workspaceBilling.delete({
+        return await transaction.billing.delete({
           where: { id: billing.id },
         });
       });
@@ -282,20 +290,23 @@ export class PurchaseService {
       include: { contents: true },
     });
 
-    // 금액 계산 후 오름차순 정렬
     const purchasePrice = eventHistories
-      .reduce<{ isContentSend: boolean; price: number }[]>((acc, cur) => {
-        let price = alimtalkSendPrice;
-        if (cur.contents.length > 0)
-          price += contentSendPrice * cur.contents.length;
+      .reduce<{ contentSend: boolean; contentCount: number; price: number }[]>(
+        (acc, cur) => {
+          let price = alimtalkSendPrice;
+          if (cur.contents.length > 0)
+            price += contentSendPrice * cur.contents.length;
 
-        acc.push({
-          isContentSend: cur.contents.length > 0 ? true : false,
-          price,
-        });
+          acc.push({
+            contentSend: cur.contents.length > 0,
+            contentCount: cur.contents.length,
+            price,
+          });
 
-        return acc;
-      }, [])
+          return acc;
+        },
+        [],
+      )
       .sort((a, b) => a.price - b.price);
 
     const amount = purchasePrice.reduce((acc, cur) => acc + cur.price, 0);
@@ -319,9 +330,10 @@ export class PurchaseService {
 
     const totalAmount = freeTrialAvailable ? 0 : defaultAmount - discountAmount;
 
-    const contentSendCount = purchasePrice.filter(
-      (item) => item.isContentSend,
-    ).length;
+    const contentSendCount = purchasePrice.reduce(
+      (acc, cur) => (cur.contentSend ? acc + cur.contentCount || 0 : acc),
+      0,
+    );
     const alimtalkSendCount = purchasePrice.length;
 
     return {
@@ -353,8 +365,6 @@ export class PurchaseService {
       throw new NotFoundException('설정 정보를 찾을 수 없습니다.');
     }
 
-    const { alimtalkSendPrice, contentSendPrice } = config;
-
     for (const workspace of workspaces) {
       const { lastPurchaseAt, nextPurchaseAt } = workspace;
 
@@ -373,8 +383,6 @@ export class PurchaseService {
         const {
           freeTrialAvailable,
           noPurchase,
-          contentSendCount,
-          alimtalkSendCount,
           amount,
           discountAmount,
           totalAmount,
@@ -386,17 +394,6 @@ export class PurchaseService {
           transaction,
         );
 
-        const createPurchaseRecepit: Prisma.RecepitCreateInput = {
-          workspace: { connect: { id: workspace.id } },
-          contentSendCount,
-          alimtalkSendCount,
-          alimtalkPrice: alimtalkSendPrice,
-          contentPrice: contentSendPrice,
-          amount,
-          discountAmount,
-          totalAmount,
-        };
-
         if (totalAmount === 0 || freeTrialAvailable || noPurchase) {
           return await transaction.purchaseHistory.create({
             data: {
@@ -404,16 +401,13 @@ export class PurchaseService {
               amount: 0,
               discountAmount: 0,
               totalAmount: 0,
-              reason: '스르륵 메세지 발송비용 청구',
+              reason: '스르륵 메시지 발송비용 청구',
               status: PurchaseStatus.PAID,
-              recepit: {
-                create: createPurchaseRecepit,
-              },
             },
           });
         }
 
-        const billing = await transaction.workspaceBilling.findUnique({
+        const billing = await transaction.billing.findUnique({
           where: { workspaceId: workspace.id },
         });
 
@@ -424,20 +418,8 @@ export class PurchaseService {
               amount,
               discountAmount,
               totalAmount,
-              reason: '스르륵 메세지 발송비용 청구',
+              reason: '스르륵 메시지 발송비용 청구',
               status: PurchaseStatus.FAILED,
-              recepit: {
-                create: {
-                  workspace: { connect: { id: workspace.id } },
-                  contentSendCount,
-                  alimtalkSendCount,
-                  alimtalkPrice: alimtalkSendPrice,
-                  contentPrice: contentSendPrice,
-                  amount,
-                  discountAmount,
-                  totalAmount,
-                },
-              },
             },
           });
 
@@ -458,11 +440,8 @@ export class PurchaseService {
             amount,
             discountAmount,
             totalAmount,
-            reason: '스르륵 메세지 발송비용 청구',
+            reason: '스르륵 메시지 발송비용 청구',
             status: PurchaseStatus.READY,
-            recepit: {
-              create: createPurchaseRecepit,
-            },
           },
         });
 
@@ -475,7 +454,7 @@ export class PurchaseService {
             paymentKey,
             billingKey,
             {
-              orderName: '스르륵 메세지 발송비용 청구',
+              orderName: '스르륵 메시지 발송비용 청구',
               ordererId: workspaceId.toString(),
               ordererName: workspaceName,
               amount: totalAmount,
@@ -590,11 +569,10 @@ export class PurchaseService {
       return false;
     }
 
-    const workspaceBilling =
-      await this.prismaService.workspaceBilling.findUnique({
-        where: { id: purchase.billingId },
-      });
-    if (!workspaceBilling) {
+    const billing = await this.prismaService.billing.findUnique({
+      where: { id: purchase.billingId },
+    });
+    if (!billing) {
       this.logger.error('결제 정보를 찾을 수 없습니다.');
 
       await this.telegramService.sendMessage({
@@ -626,7 +604,7 @@ export class PurchaseService {
     try {
       const scheduledId = await this.portoneService.requestScheduledPayment(
         purchase.id + retryCount,
-        workspaceBilling.billingKey,
+        billing.billingKey,
         nextRetry,
         {
           orderName: '스르륵 발송 후불 청구',

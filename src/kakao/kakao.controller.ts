@@ -43,11 +43,11 @@ export class KakaoController {
 
   @Get('category/message')
   @ApiOperation({
-    summary: '카카오 메세지 카테고리 조회',
+    summary: '카카오 메시지 카테고리 조회',
   })
   @ApiResponse({
     status: 200,
-    description: '카카오 메세지 카테고리 조회 성공',
+    description: '카카오 메시지 카테고리 조회 성공',
     type: KakaoCategoryDto,
   })
   @Serialize(KakaoCategoryDto)

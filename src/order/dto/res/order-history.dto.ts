@@ -5,14 +5,14 @@ import { Exclude, Expose, Type } from 'class-transformer';
 export class EventHistoryMessageDto {
   @Expose()
   @ApiProperty({
-    description: '메세지 아이디',
+    description: '메시지 아이디',
     example: 1,
   })
   id: number;
 
   @Expose()
   @ApiProperty({
-    description: '메세지 명',
+    description: '메시지 명',
     example: '테스트 발송 101.',
   })
   name: string;
@@ -48,14 +48,14 @@ export class EventHistoryDto {
 
   @Expose()
   @ApiProperty({
-    description: '메세지 아이디',
+    description: '메시지 아이디',
     example: 1,
   })
   messageId: number;
 
   @Expose()
   @ApiProperty({
-    description: '메세지',
+    description: '메시지',
     type: EventHistoryMessageDto,
   })
   @Type(() => EventHistoryMessageDto)

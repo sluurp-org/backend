@@ -156,7 +156,7 @@ export class EventService {
   ): Promise<
     Pick<
       Prisma.EventHistoryCreateInput,
-      'event' | 'order' | 'contents' | 'status' | 'message' | 'messageTemplate'
+      'event' | 'order' | 'contents' | 'status' | 'message' | 'rawMessage'
     >
   > {
     const { id: orderId, receiverPhone, quantity } = order;
@@ -188,7 +188,7 @@ export class EventService {
         }
 
         return {
-          messageTemplate: { connect: { id: messageId } },
+          message: { connect: { id: messageId } },
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
           contents: {
@@ -207,7 +207,7 @@ export class EventService {
           event: { connect: { id: eventId } },
           order: { connect: { id: orderId } },
           status: EventStatus.FAILED,
-          message: error.message,
+          rawMessage: error.message,
         };
       }
     }
@@ -216,13 +216,13 @@ export class EventService {
       return {
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
-        message: '수신자 전화번호가 유효하지 않습니다.',
+        rawMessage: '수신자 전화번호가 유효하지 않습니다.',
         status: EventStatus.FAILED,
       };
 
     try {
       return {
-        messageTemplate: { connect: { id: messageId } },
+        message: { connect: { id: messageId } },
         event: { connect: { id: eventId } },
         order: { connect: { id: orderId } },
         status: EventStatus.CONTENT_READY,
@@ -257,7 +257,7 @@ export class EventService {
       return Promise.all(
         eventHistoryInputs.map(async (eventHistoryInput) => {
           const { id: orderId, storeId, workspaceId } = order;
-          const { message } = eventHistoryInput;
+          const { rawMessage } = eventHistoryInput;
 
           const eventHistory = await transaction.eventHistory.create({
             data: {
@@ -268,13 +268,13 @@ export class EventService {
                   orderId,
                   storeId,
                   workspaceId,
-                  message,
+                  message: rawMessage || '',
                   type: OrderHistoryType.EVENT,
                 },
               },
             },
             include: {
-              messageTemplate: {
+              message: {
                 include: {
                   kakaoTemplate: true,
                 },
@@ -294,7 +294,7 @@ export class EventService {
   private createMessageBody(
     eventHistory: Prisma.EventHistoryGetPayload<{
       include: {
-        messageTemplate: {
+        message: {
           include: {
             kakaoTemplate: true;
           };
@@ -310,12 +310,12 @@ export class EventService {
     }>,
     variables: Variables[],
   ): Prisma.EventHistoryUpdateInput {
-    const { messageTemplate, id: eventHistoryId } = eventHistory;
-    if (!messageTemplate?.kakaoTemplate) {
-      throw new Error('메세지가 존재하지 않습니다.');
+    const { message, id: eventHistoryId } = eventHistory;
+    if (!message?.kakaoTemplate) {
+      throw new Error('메시지가 존재하지 않습니다.');
     }
 
-    const { kakaoTemplate } = messageTemplate;
+    const { kakaoTemplate } = message;
     const { product, productVariant, store, orderAt, ...orderRest } = order;
 
     const variableBody = {
@@ -413,7 +413,7 @@ export class EventService {
     );
 
     this.logger.log(
-      `${successedMessage.length}개의 메세지 바디를 생성하였습니다.`,
+      `${successedMessage.length}개의 메시지 바디를 생성하였습니다.`,
     );
 
     const failedMessage = messageBodies.filter(
@@ -423,7 +423,7 @@ export class EventService {
 
     if (failedMessage.length) {
       this.logger.error(
-        `${failedMessage.length}개의 메세지 바디를 생성하는데 실패하였습니다.`,
+        `${failedMessage.length}개의 메시지 바디를 생성하는데 실패하였습니다.`,
       );
 
       failedMessage.forEach(({ reason }) => {

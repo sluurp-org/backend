@@ -55,13 +55,6 @@ enum Provider {
   NAVER
 }
 
-model InternalMailTemplate {
-  id Int @id @default(autoincrement())
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
-}
-
 model WorkspaceUser {
   id          Int           @id @default(autoincrement())
   userId      Int
@@ -93,6 +86,7 @@ model Workspace {
   lastPurchaseAt DateTime @default(now())
   nextPurchaseAt DateTime
 
+  billing                    Billing?
   workspaceUser              WorkspaceUser[]
   store                      Store[]
   product                    Product[]
@@ -100,18 +94,16 @@ model Workspace {
   content                    Content[]
   event                      Event[]
   kakaoCredential            KakaoCredential?
-  messageTemplate            MessageTemplate[]
+  message                    Message[]
   orderHistory               OrderHistory[]
   contentGroup               ContentGroup[]
   purchaseHistory            PurchaseHistory[]
-  workspaceBilling           WorkspaceBilling?
   eventHistory               EventHistory[]
-  Recepit                    Recepit[]
-  DailyWorkspaceStatistics   DailyWorkspaceStatistics[]
-  MonthlyWorkspaceStatistics MonthlyWorkspaceStatistics[]
+  dailyWorkspaceStatistics   DailyWorkspaceStatistics[]
+  monthlyWorkspaceStatistics MonthlyWorkspaceStatistics[]
 }
 
-model WorkspaceBilling {
+model Billing {
   id          Int    @id @default(autoincrement())
   workspaceId Int
   cardNumber  String
@@ -126,13 +118,25 @@ model WorkspaceBilling {
   @@unique([workspaceId])
 }
 
+model KakaoCredential {
+  id          Int    @id @default(autoincrement())
+  workspaceId Int    @unique
+  channelId   String @unique
+  searchId    String @unique
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+}
+
 model Store {
-  id          Int       @id @default(autoincrement())
-  name        String
-  type        StoreType
-  enabled     Boolean   @default(true)
-  readonly    Boolean   @default(false)
+  id          Int @id @default(autoincrement())
   workspaceId Int
+
+  name    String
+  type    StoreType
+  enabled Boolean   @default(true)
 
   lastProductSyncAt DateTime?
   lastOrderSyncAt   DateTime?
@@ -183,9 +187,9 @@ model SmartStoreToken {
 }
 
 model Product {
-  id           Int     @id @default(autoincrement())
-  name         String
-  productImage String?
+  id              Int     @id @default(autoincrement())
+  name            String
+  productImageUrl String?
 
   productId          String
   storeId            Int
@@ -206,11 +210,11 @@ model Product {
 }
 
 model ProductVariant {
-  id        Int    @id @default(autoincrement())
+  id   Int    @id @default(autoincrement())
+  name String
+
   productId Int
   variantId String
-
-  name String
 
   product Product @relation(fields: [productId], references: [id])
 
@@ -311,22 +315,22 @@ enum OrderHistoryType {
 }
 
 model ContentGroup {
-  id          Int         @id @default(autoincrement())
-  name        String
+  id          Int @id @default(autoincrement())
   workspaceId Int
-  type        ContentType @default(TEXT)
-  readonly    Boolean     @default(false)
 
-  oneTime       Boolean @default(false)
+  name          String
+  type          ContentType @default(TEXT)
+  oneTime       Boolean     @default(false)
   expireMinute  Int?
   downloadLimit Int?
 
-  workspace       Workspace         @relation(fields: [workspaceId], references: [id])
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  deletedAt       DateTime?
-  content         Content[]
-  messageTemplate MessageTemplate[]
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  content Content[]
+  message Message[]
 }
 
 enum ContentType {
@@ -343,11 +347,9 @@ model Content {
   contentGroupId Int
   used           Boolean @default(false)
 
-  // text type QR code, barcode, url, etc...
   text String?
   type ContentType @default(TEXT)
 
-  // file type
   status    ContentStatus @default(PENDING)
   name      String?
   key       String?
@@ -358,27 +360,16 @@ model Content {
   contentGroup ContentGroup @relation(fields: [contentGroupId], references: [id])
   workspace    Workspace    @relation(fields: [workspaceId], references: [id])
 
-  createdAt            DateTime                        @default(now())
-  updatedAt            DateTime                        @default(now()) @updatedAt
-  deletedAt            DateTime?
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
   eventHistoryContents EventHistoryContentConnection[]
 }
 
 enum ContentStatus {
   PENDING
   READY
-}
-
-model KakaoCredential {
-  id          Int    @id @default(autoincrement())
-  workspaceId Int    @unique
-  channelId   String @unique
-  searchId    String @unique
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
-
-  createdAt DateTime @default(now())
-  updatedAt DateTime @default(now()) @updatedAt
 }
 
 model Event {
@@ -394,7 +385,7 @@ model Event {
   product        Product?        @relation(fields: [productId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
   workspace      Workspace       @relation(fields: [workspaceId], references: [id])
-  message        MessageTemplate @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
+  message        Message         @relation(fields: [messageId], references: [id], onDelete: Cascade, onUpdate: Cascade)
 
   createdAt    DateTime       @default(now())
   updatedAt    DateTime       @default(now()) @updatedAt
@@ -429,25 +420,27 @@ model EventHistory {
   orderId     Int?
   messageId   Int?
 
+  receiverPhone String?
+  receiverEmail String?
+
   messageContent   String? @db.LongText
   messageVariables Json?
 
-  status  EventStatus
-  message String?
+  status     EventStatus
+  rawMessage String?
 
-  processedAt      DateTime?
-  solapiStatusCode String?
-  solapiMessageId  String?
+  processedAt       DateTime?
+  externalMessageId String?
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
 
-  workspace       Workspace                       @relation(fields: [workspaceId], references: [id])
-  event           Event?                          @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  order           Order?                          @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  messageTemplate MessageTemplate?                @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
-  orderHistory    OrderHistory[]
-  contents        EventHistoryContentConnection[]
+  workspace    Workspace                       @relation(fields: [workspaceId], references: [id])
+  event        Event?                          @relation(fields: [eventId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  order        Order?                          @relation(fields: [orderId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  message      Message?                        @relation(fields: [messageId], references: [id], onDelete: SetNull, onUpdate: Cascade)
+  orderHistory OrderHistory[]
+  contents     EventHistoryContentConnection[]
 }
 
 enum EventStatus {
@@ -459,18 +452,14 @@ enum EventStatus {
   FAILED // 발송 실패
 }
 
-enum MessageTarget {
-  BUYER
-  RECEIVER
-  CUSTOM
-}
-
-model MessageTemplate {
-  id               Int     @id @default(autoincrement())
+model Message {
+  id               Int             @id @default(autoincrement())
   name             String
-  completeDelivery Boolean @default(false)
-  readonly         Boolean @default(false)
-  isGlobal         Boolean @default(false)
+  completeDelivery Boolean         @default(false)
+  sendType         MessageSendType
+  type             MessageType     @default(FULLY_CUSTOM)
+
+  content String?
 
   workspaceId     Int?
   kakaoTemplateId Int?
@@ -490,13 +479,31 @@ model MessageTemplate {
   eventHistory EventHistory[]
 }
 
+enum MessageType {
+  GLOBAL
+  CUSTOM
+  FULLY_CUSTOM
+}
+
+enum MessageSendType {
+  KAKAO
+}
+
+enum MessageTarget {
+  BUYER
+  RECEIVER
+  CUSTOM
+}
+
 model KakaoTemplate {
-  id         Int                 @id @default(autoincrement())
-  templateId String              @unique
-  status     KakaoTemplateStatus @default(PENDING)
+  id                Int                 @id @default(autoincrement())
+  templateId        String              @unique
+  status            KakaoTemplateStatus @default(PENDING)
+  isCustomAvailable Boolean             @default(false) // 커스텀 메시지 사용 가능 여부
 
   categoryCode String
-  content      String @db.LongText
+  content      String  @db.LongText
+  isGlobal     Boolean @default(false)
 
   /// [KakaoTemplateButtons]
   buttons Json?
@@ -505,16 +512,16 @@ model KakaoTemplate {
   imageUrl String?
   extra    String?
 
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  messageTemplate MessageTemplate[]
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  message   Message[]
 }
 
 enum KakaoTemplateStatus {
+  UPLOADED
+  PENDING
   APPROVED
   REJECTED
-  PENDING
-  UPLOADED
 }
 
 model Variables {
@@ -527,32 +534,6 @@ model Variables {
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
-}
-
-model Recepit {
-  id Int @id @default(autoincrement())
-
-  workspaceId Int
-
-  emailSendCount    Int @default(0)
-  alimtalkSendCount Int @default(0)
-  contentSendCount  Int @default(0)
-
-  emailPrice    Int @default(0)
-  alimtalkPrice Int @default(0)
-  contentPrice  Int @default(0)
-
-  amount         Int @default(0)
-  discountAmount Int @default(0)
-  totalAmount    Int @default(0)
-
-  issuedAt DateTime @default(now())
-
-  workspace Workspace @relation(fields: [workspaceId], references: [id])
-
-  createdAt       DateTime          @default(now())
-  updatedAt       DateTime          @default(now()) @updatedAt
-  PurchaseHistory PurchaseHistory[]
 }
 
 model PurchaseHistory {
@@ -569,16 +550,14 @@ model PurchaseHistory {
   purchasedAt DateTime?
   retry       Int            @default(0)
 
-  billingId   Int?
   scheduledId String?
-  recepitId   Int
 
-  recepit   Recepit           @relation(fields: [recepitId], references: [id])
-  workspace Workspace         @relation(fields: [workspaceId], references: [id])
-  billing   WorkspaceBilling? @relation(fields: [billingId], references: [id])
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
 
   createdAt DateTime @default(now())
   updatedAt DateTime @default(now()) @updatedAt
+  billing   Billing? @relation(fields: [billingId], references: [id])
+  billingId Int?
 
   @@index([workspaceId])
 }
@@ -586,11 +565,10 @@ model PurchaseHistory {
 model Config {
   id Int @id @default(autoincrement())
 
-  defaultPrice        Int @default(5000)
-  customAlimtalkPrice Int @default(50)
-  alimtalkSendPrice   Int @default(100)
-  emailSendPrice      Int @default(150)
-  contentSendPrice    Int @default(100)
+  defaultPrice      Int @default(5000)
+  alimtalkSendPrice Int @default(100)
+  emailSendPrice    Int @default(150)
+  contentSendPrice  Int @default(100)
 }
 
 enum PurchaseStatus {
@@ -607,7 +585,7 @@ model DailyStoreStatistics {
   id Int @id @default(autoincrement())
 
   storeId        Int
-  orderDate      DateTime
+  orderDate      DateTime @db.Date
   totalOrders    Int
   totalQuantity  Int
   totalSales     Int
@@ -625,7 +603,7 @@ model MonthlyStoreStatistics {
   id Int @id @default(autoincrement())
 
   storeId        Int
-  orderMonth     DateTime
+  orderMonth     DateTime @db.Date
   totalOrders    Int
   totalQuantity  Int
   totalSales     Int
@@ -643,7 +621,7 @@ model DailyWorkspaceStatistics {
   id Int @id @default(autoincrement())
 
   workspaceId    Int
-  orderDate      DateTime
+  orderDate      DateTime @db.Date
   totalOrders    Int
   totalQuantity  Int
   totalSales     Int
@@ -661,7 +639,7 @@ model MonthlyWorkspaceStatistics {
   id Int @id @default(autoincrement())
 
   workspaceId    Int
-  orderMonth     DateTime
+  orderMonth     DateTime @db.Date
   totalOrders    Int
   totalQuantity  Int
   totalSales     Int

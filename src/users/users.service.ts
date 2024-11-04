@@ -49,12 +49,11 @@ export class UsersService {
     }
   }
 
-  public async findOneByLoginId(loginId: string): Promise<User> {
+  public async findOneByLoginId(loginId: string): Promise<User | null> {
     try {
       const user = await this.prismaService.user.findUnique({
         where: { loginId, deletedAt: null },
       });
-      if (!user) throw new NotFoundException('사용자 정보가 없습니다.');
 
       return user;
     } catch (error) {

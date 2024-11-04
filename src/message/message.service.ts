@@ -8,7 +8,13 @@ import {
 import { PrismaService } from 'src/prisma/prisma.service';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
-import { KakaoTemplateStatus, MessageTarget, Prisma } from '@prisma/client';
+import {
+  KakaoTemplateStatus,
+  MessageSendType,
+  MessageTarget,
+  MessageType,
+  Prisma,
+} from '@prisma/client';
 import {
   CreateKakaoTemplateBodyDto,
   KakaoTemplateButton,
@@ -40,9 +46,12 @@ export class MessageService {
 
   public async findAll(id: number, dto: FindMessageQueryDto) {
     const { name, take, skip } = dto;
-    return this.prismaService.messageTemplate.findMany({
+    return this.prismaService.message.findMany({
       where: {
-        OR: [{ workspaceId: id, name: { contains: name } }, { isGlobal: true }],
+        OR: [
+          { workspaceId: id, name: { contains: name } },
+          { type: MessageType.GLOBAL },
+        ],
       },
       orderBy: { id: 'desc' },
       take,
@@ -52,17 +61,17 @@ export class MessageService {
 
   public async count(id: number, dto: FindMessageQueryDto) {
     const { name } = dto;
-    return this.prismaService.messageTemplate.count({
+    return this.prismaService.message.count({
       where: { workspaceId: id, name: { contains: name } },
     });
   }
 
   public async findOne(id: number, messageId: number) {
-    const message = await this.prismaService.messageTemplate.findFirst({
+    const message = await this.prismaService.message.findFirst({
       where: {
         OR: [
           { id: messageId, workspaceId: id },
-          { id: messageId, isGlobal: true },
+          { id: messageId, type: MessageType.GLOBAL },
         ],
       },
       include: {
@@ -71,41 +80,60 @@ export class MessageService {
       },
     });
     if (!message) throw new NotFoundException('메시지가 존재하지 않습니다.');
-    if (!message.kakaoTemplate)
-      throw new NotFoundException('템플릿이 존재하지 않습니다.');
 
-    const comments: string[] = [];
-    if (
-      !message.isGlobal &&
-      message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED
-    ) {
-      const kakaoTemplate = await this.kakaoService.getKakaoTemplate(
-        message.kakaoTemplate.templateId,
-      );
+    if (message.sendType === MessageSendType.KAKAO) {
+      if (!message.kakaoTemplate)
+        throw new NotFoundException('메시지가 존재하지 않습니다.');
 
-      comments.push(
-        ...(kakaoTemplate.comments ?? [])
-          .filter((c) => c.isAdmin)
-          .map((c) => c.content),
-      );
+      if (message.type === MessageType.GLOBAL) {
+        return {
+          ...message,
+          kakaoTemplate: {
+            ...message.kakaoTemplate,
+            comments: [],
+          },
+        };
+      }
+
+      const comments: string[] = [];
+      if (message.kakaoTemplate.status === KakaoTemplateStatus.REJECTED) {
+        const kakaoTemplate = await this.kakaoService.getKakaoTemplate(
+          message.kakaoTemplate.templateId,
+        );
+
+        comments.push(
+          ...(kakaoTemplate.comments ?? [])
+            .filter((c) => c.isAdmin)
+            .map((c) => c.content),
+        );
+      }
+
+      if (!message) {
+        throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
+      }
+
+      return {
+        ...message,
+        kakaoTemplate: {
+          ...message.kakaoTemplate,
+          comments,
+        },
+      };
     }
 
-    if (!message) {
-      throw new NotFoundException('메시지 템플릿이 존재하지 않습니다.');
-    }
-
-    return {
-      ...message,
-      kakaoTemplate: {
-        ...message.kakaoTemplate,
-        comments,
-      },
-    };
+    throw new BadRequestException('지원하지 않는 메시지 타입입니다.');
   }
 
   public async createMessage(workspaceId: number, dto: CreateMessageBodyDto) {
-    const { name, kakaoTemplate, target, customPhone, customEmail, ...rest } =
-      dto;
+    const {
+      name,
+      kakaoTemplate,
+      sendType,
+      target,
+      customPhone,
+      customEmail,
+      ...rest
+    } = dto;
 
     if (target === MessageTarget.CUSTOM && !customPhone && !customEmail) {
       throw new BadRequestException(
@@ -113,17 +141,29 @@ export class MessageService {
       );
     }
 
-    if (!kakaoTemplate)
-      throw new BadRequestException('메세지를 생성해야 합니다.');
+    if (sendType === MessageSendType.KAKAO) {
+      if (!kakaoTemplate)
+        throw new BadRequestException('카카오 템플릿을 생성해야 합니다.');
 
-    return this.prismaService.$transaction(async (tx) => {
-      const message = await tx.messageTemplate.create({
-        data: { name, workspaceId, target, customPhone, customEmail, ...rest },
+      return this.prismaService.$transaction(async (tx) => {
+        const message = await tx.message.create({
+          data: {
+            name,
+            workspaceId,
+            sendType,
+            target,
+            customPhone,
+            customEmail,
+            ...rest,
+          },
+        });
+
+        await this.handleKakaoTemplateCreation(tx, message.id, kakaoTemplate);
+        return message;
       });
+    }
 
-      await this.handleKakaoTemplateCreation(tx, message.id, kakaoTemplate);
-      return message;
-    });
+    throw new BadRequestException('지원하지 않는 메시지 타입입니다.');
   }
 
   private async handleKakaoTemplateCreation(
@@ -168,7 +208,7 @@ export class MessageService {
         where: { id: createdKakaoTemplate.id },
         data: { templateId },
       });
-      await tx.messageTemplate.update({
+      await tx.message.update({
         where: { id: messageId },
         data: {
           kakaoTemplate: {
@@ -187,8 +227,8 @@ export class MessageService {
     workspaceId: number,
     messageId: number,
   ) {
-    const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId, isGlobal: false },
+    const message = await this.prismaService.message.findUnique({
+      where: { id: messageId, workspaceId, type: MessageType.FULLY_CUSTOM },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -212,8 +252,8 @@ export class MessageService {
   }
 
   public async cancelMessageInspection(workspaceId: number, messageId: number) {
-    const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId, isGlobal: false },
+    const message = await this.prismaService.message.findUnique({
+      where: { id: messageId, workspaceId, type: MessageType.FULLY_CUSTOM },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -244,8 +284,8 @@ export class MessageService {
     messageId: number,
     dto: UpdateMessageBodyDto,
   ) {
-    const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId, isGlobal: false },
+    const message = await this.prismaService.message.findUnique({
+      where: { id: messageId, workspaceId, type: MessageType.FULLY_CUSTOM },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -271,7 +311,7 @@ export class MessageService {
       if (kakaoTemplate)
         await this.updateKakaoTemplate(tx, message, kakaoTemplate);
 
-      return tx.messageTemplate.update({
+      return tx.message.update({
         where: { id: messageId },
         data: {
           name,
@@ -287,7 +327,7 @@ export class MessageService {
 
   private async updateKakaoTemplate(
     tx: Prisma.TransactionClient,
-    message: Prisma.MessageTemplateGetPayload<{
+    message: Prisma.MessageGetPayload<{
       include: { kakaoTemplate: true };
     }>,
     dto: UpdateKakaoTemplateBodyDto,
@@ -327,8 +367,8 @@ export class MessageService {
   }
 
   public async deleteMessage(workspaceId: number, messageId: number) {
-    const message = await this.prismaService.messageTemplate.findUnique({
-      where: { id: messageId, workspaceId, isGlobal: false },
+    const message = await this.prismaService.message.findUnique({
+      where: { id: messageId, workspaceId, type: MessageType.FULLY_CUSTOM },
       include: { kakaoTemplate: true },
     });
     if (!message) {
@@ -338,7 +378,7 @@ export class MessageService {
       throw new BadRequestException('메시지 템플릿이 존재하지 않습니다.');
 
     return this.prismaService.$transaction(async (tx) => {
-      await tx.messageTemplate.delete({ where: { id: messageId } });
+      await tx.message.delete({ where: { id: messageId } });
       message.kakaoTemplate?.templateId &&
         (await this.kakaoService.deleteKakaoTemplate(
           message.kakaoTemplate?.templateId,

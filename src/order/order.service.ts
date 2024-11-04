@@ -266,7 +266,7 @@ export class OrderService {
         eventHistory: {
           include: {
             event: true,
-            messageTemplate: true,
+            message: true,
           },
         },
       },
@@ -392,19 +392,13 @@ export class OrderService {
             ? [{ productId: null, productVariantId: null }]
             : []),
         ],
-        message: {
-          readonly: false,
-        },
       },
       include: {
         message: { include: { contentGroup: true } },
       },
     });
 
-    return events.filter(
-      (event) =>
-        !event.message.contentGroup?.readonly || !event.message.contentGroup,
-    );
+    return events.filter((event) => !event.message.contentGroup);
   }
 
   private async processBatchUpdateOrder(

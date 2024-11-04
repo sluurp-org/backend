@@ -1,4 +1,9 @@
-import { Injectable, Logger, NotAcceptableException } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotAcceptableException,
+} from '@nestjs/common';
 import {
   EventStatus,
   KakaoTemplateStatus,
@@ -59,7 +64,48 @@ export class WorkerService {
   }
 
   public async expiredSmartstoreToken(applicationId: string) {
-    // TODO: Implement this function
+    if (!applicationId)
+      throw new BadRequestException('applicationId를 찾을 수 없습니다.');
+
+    const targetUsers = await this.prismaService.store.findMany({
+      where: {
+        smartStoreCredentials: { applicationId },
+        deletedAt: null,
+        enabled: true,
+      },
+      include: {
+        workspace: {
+          include: { workspaceUser: { include: { user: true } } },
+        },
+      },
+    });
+
+    if (targetUsers.length > 0)
+      try {
+        await this.kakaoService.sendKakaoMessage(
+          targetUsers
+            .map((item) =>
+              item.workspace.workspaceUser.map(({ user }) => {
+                return {
+                  to: user.phone,
+                  templateId: 'KA01TP241103083701188oSf6ZShyoQ2',
+                  variables: {
+                    '#{고객명}': user.name,
+                    '#{워크스페이스명}': item.workspace.name,
+                    '#{스토어명}': item.name,
+                    '#{사유}': '토큰 만료',
+                    '#{워크스페이스아이디}': item.workspaceId,
+                    '#{스토어아이디}': item.id,
+                  },
+                };
+              }),
+            )
+            .flat(),
+        );
+      } catch (error) {
+        this.logger.error(error);
+      }
+
     await this.prismaService.store.updateMany({
       where: { smartStoreCredentials: { applicationId } },
       data: {
@@ -91,7 +137,7 @@ export class WorkerService {
       where: { id },
       data: { status },
       include: {
-        messageTemplate: {
+        message: {
           include: {
             kakaoTemplate: {
               where: { status: KakaoTemplateStatus.APPROVED },
@@ -111,7 +157,7 @@ export class WorkerService {
       [KakaoTemplateStatus.UPLOADED]: '등록',
     };
 
-    const sendMessages = updatedTemplate.messageTemplate
+    const sendMessages = updatedTemplate.message
       .map(({ id, workspaceId, workspace }) =>
         workspace?.workspaceUser.map(({ user }) => {
           return {
@@ -121,7 +167,7 @@ export class WorkerService {
               '#{고객명}': user.name,
               '#{상태}': mapStatus[status],
               '#{워크스페이스_아이디}': workspaceId,
-              '#{메세지_아이디}': id,
+              '#{메시지_아이디}': id,
             },
           };
         }),
@@ -194,9 +240,8 @@ export class WorkerService {
               data: {
                 status: EventStatus.SUCCESS,
                 processedAt: dateProcessed,
-                solapiMessageId: messageId,
-                solapiStatusCode: statusCode,
-                message: '메세지 발송 성공',
+                externalMessageId: messageId,
+                rawMessage: '메시지 발송 성공',
               },
             });
 
@@ -220,9 +265,8 @@ export class WorkerService {
             data: {
               status: EventStatus.FAILED,
               processedAt: dateProcessed,
-              solapiMessageId: messageId,
-              solapiStatusCode: statusCode,
-              message: '메세지 발송 실패',
+              externalMessageId: messageId,
+              rawMessage: '메시지 발송 실패',
             },
           });
 

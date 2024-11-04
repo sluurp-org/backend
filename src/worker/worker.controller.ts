@@ -23,6 +23,7 @@ import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.
 import { PurchaseService } from 'src/purchase/purchase.service';
 import { PortoneGuard } from 'src/portone/gurad/portone.guard';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
+import { AnalyticsService } from 'src/analytics/analytics.service';
 
 @ApiTags('worker')
 @Controller('worker')
@@ -30,6 +31,7 @@ export class WorkerController {
   constructor(
     private readonly workerService: WorkerService,
     private readonly purchaseService: PurchaseService,
+    private readonly analyticsService: AnalyticsService,
   ) {}
 
   @ApiOperation({
@@ -101,7 +103,7 @@ export class WorkerController {
     description: '네이버 커머스 토큰 만료 성공',
     type: String,
   })
-  @Get('smartstore/token-expired')
+  @Post('smartstore/token-expired')
   @WorkerAuth()
   public async expiredSmartstoreToken(
     @Body('applicationId') applicationId: string,
@@ -159,8 +161,8 @@ export class WorkerController {
 
   @Post('solapi/message')
   @ApiOperation({
-    summary: '솔라피 메세지 발송 결과 웹훅',
-    description: '솔라피 메세지 발송 결과 웹훅을 처리합니다.',
+    summary: '솔라피 메시지 발송 결과 웹훅',
+    description: '솔라피 메시지 발송 결과 웹훅을 처리합니다.',
   })
   public async handleSolapiMessageWebhook(
     @Body() dto: SolapiMessageStatuBodyDto[],
@@ -176,5 +178,25 @@ export class WorkerController {
   @UseGuards(PortoneGuard)
   public async webhook(@Body() dto: WebhookBodyDto) {
     return this.purchaseService.handlePaymentWebhook(dto);
+  }
+
+  @Post('analytics/daily')
+  @ApiOperation({
+    summary: '일일 분석 생성',
+    description: '일일 분석을 생성합니다.',
+  })
+  @WorkerAuth()
+  public async generateDailyAnalytics() {
+    return this.analyticsService.generateDailyAnalytics();
+  }
+
+  @Post('analytics/monthly')
+  @ApiOperation({
+    summary: '월간 분석 생성',
+    description: '월간 분석을 생성합니다.',
+  })
+  @WorkerAuth()
+  public async generateMonthlyAnalytics() {
+    return this.analyticsService.generateMonthlyAnalytics();
   }
 }

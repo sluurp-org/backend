@@ -7,6 +7,7 @@ import { StoreModule } from 'src/store/store.module';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { PurchaseModule } from 'src/purchase/purchase.module';
 import { KakaoModule } from 'src/kakao/kakao.module';
+import { AnalyticsModule } from 'src/analytics/analytics.module';
 
 @Module({
   imports: [
@@ -17,6 +18,7 @@ import { KakaoModule } from 'src/kakao/kakao.module';
     PrismaModule,
     PurchaseModule,
     KakaoModule,
+    AnalyticsModule,
   ],
   controllers: [WorkerController],
   providers: [WorkerService],

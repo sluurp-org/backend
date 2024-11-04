@@ -172,7 +172,7 @@ export class MessageDto {
   contentGroupId?: number;
 
   @ApiProperty({
-    description: '메세지 배송 완료 여부',
+    description: '메시지 배송 완료 여부',
     example: true,
   })
   @Expose()
@@ -218,7 +218,7 @@ export class MessageDto {
 
   @Expose()
   @ApiProperty({
-    description: '메세지 수신자 타입',
+    description: '메시지 수신자 타입',
     enum: MessageTarget,
     example: MessageTarget.BUYER,
   })

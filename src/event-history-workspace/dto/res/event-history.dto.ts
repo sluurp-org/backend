@@ -260,7 +260,7 @@ export class EventHistoryDto {
 
   @Expose()
   @ApiProperty({
-    description: '이벤트 메세지',
+    description: '이벤트 메시지',
     example: '2024-01-01',
   })
   @Type(() => EventHistoryMessageDto)

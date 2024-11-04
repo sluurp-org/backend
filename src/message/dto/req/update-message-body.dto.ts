@@ -37,7 +37,7 @@ export class UpdateMessageBodyDto {
   contentGroupId?: number;
 
   @ApiProperty({
-    description: '메세지 배송 완료 여부',
+    description: '메시지 배송 완료 여부',
     example: true,
   })
   @IsBoolean()

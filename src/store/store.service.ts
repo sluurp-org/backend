@@ -264,11 +264,11 @@ export class StoreService {
                   productId: originProductNo.toString(),
                   store: { connect: { id: storeId } },
                   name,
-                  productImage: url,
+                  productImageUrl: url,
                 },
                 update: {
                   name,
-                  productImage: url,
+                  productImageUrl: url,
                 },
               });
             }),
@@ -370,7 +370,6 @@ export class StoreService {
     const stores = await this.prismaService.store.findMany({
       where: {
         enabled: true,
-        readonly: false,
         type: StoreType.SMARTSTORE,
         smartStoreCredentials: {
           isNot: null,

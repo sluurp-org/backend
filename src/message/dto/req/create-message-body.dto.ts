@@ -12,7 +12,7 @@ import {
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateKakaoTemplateBodyDto } from './subtemplate/create-kakao-template-body.dto';
-import { MessageTarget } from '@prisma/client';
+import { MessageSendType, MessageTarget } from '@prisma/client';
 
 export class CreateMessageBodyDto {
   @ApiProperty({
@@ -33,7 +33,7 @@ export class CreateMessageBodyDto {
   contentGroupId?: number;
 
   @ApiProperty({
-    description: '메세지 배송 완료 여부',
+    description: '메시지 배송 완료 여부',
     example: true,
   })
   @IsBoolean()
@@ -41,12 +41,21 @@ export class CreateMessageBodyDto {
   completeDelivery?: boolean;
 
   @ApiProperty({
+    description: '메시지 템플릿 발송 타입',
+    example: MessageSendType.KAKAO,
+    required: true,
+  })
+  @IsEnum(MessageSendType)
+  @IsNotEmpty()
+  sendType: MessageSendType;
+
+  @ApiProperty({
     description: '카카오 템플릿 정보',
     type: CreateKakaoTemplateBodyDto,
   })
-  @IsNotEmpty()
-  @Type(() => CreateKakaoTemplateBodyDto)
+  @IsOptional()
   @ValidateNested()
+  @Type(() => CreateKakaoTemplateBodyDto)
   kakaoTemplate?: CreateKakaoTemplateBodyDto;
 
   @ApiProperty({

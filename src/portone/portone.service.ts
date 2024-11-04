@@ -1,5 +1,6 @@
 import { HttpService } from '@nestjs/axios';
 import {
+  ConflictException,
   Injectable,
   InternalServerErrorException,
   Logger,
@@ -55,6 +56,7 @@ export class PortoneService {
 
       return billingKeyInfo.billingKey;
     } catch (error) {
+      console.log(error);
       throw new InternalServerErrorException('카드 등록에 실패했습니다.');
     }
   }
@@ -134,6 +136,10 @@ export class PortoneService {
       return payment.paidAt;
     } catch (error) {
       if (isAxiosError(error)) {
+        if (error.response?.status === 409) {
+          throw new ConflictException('결제가 이미 완료되었습니다.');
+        }
+
         console.log(error?.response?.data);
       }
 

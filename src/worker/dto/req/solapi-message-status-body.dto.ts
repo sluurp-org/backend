@@ -14,7 +14,7 @@ class CustomFields {
 
 export class SolapiMessageStatuBodyDto {
   @ApiProperty({
-    description: '메세지 아이디',
+    description: '메시지 아이디',
     example: 'M4V2024092917053597NMBWI4NER0ZFT',
   })
   @IsString()

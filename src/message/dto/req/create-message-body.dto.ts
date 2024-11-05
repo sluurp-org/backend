@@ -8,11 +8,12 @@ import {
   IsOptional,
   IsPhoneNumber,
   IsString,
+  ValidateIf,
   ValidateNested,
 } from 'class-validator';
 import { Type } from 'class-transformer';
 import { CreateKakaoTemplateBodyDto } from './subtemplate/create-kakao-template-body.dto';
-import { MessageSendType, MessageTarget } from '@prisma/client';
+import { MessageSendType, MessageTarget, MessageType } from '@prisma/client';
 
 export class CreateMessageBodyDto {
   @ApiProperty({
@@ -50,10 +51,45 @@ export class CreateMessageBodyDto {
   sendType: MessageSendType;
 
   @ApiProperty({
+    description: '메시지 타입',
+    example: MessageType.FULLY_CUSTOM,
+    enum: [MessageType.FULLY_CUSTOM, MessageType.CUSTOM],
+    required: true,
+  })
+  @IsEnum([MessageType.FULLY_CUSTOM, MessageType.CUSTOM])
+  @IsNotEmpty()
+  type: MessageType;
+
+  @ApiProperty({
+    description: '메시지 제목',
+    example: '주문이 완료되었습니다.',
+    required: false,
+  })
+  @ValidateIf((o) => o.type === MessageType.CUSTOM)
+  @IsString()
+  @IsNotEmpty()
+  content: string;
+
+  @ApiProperty({
+    description: '카카오 템플릿 아이디',
+    example: 1,
+    required: false,
+  })
+  @ValidateIf((o) => o.type === MessageType.CUSTOM)
+  @IsNumber()
+  @IsNotEmpty()
+  kakaoTemplateId: number;
+
+  @ApiProperty({
     description: '카카오 템플릿 정보',
     type: CreateKakaoTemplateBodyDto,
   })
-  @IsOptional()
+  @ValidateIf(
+    (o) =>
+      o.sendType === MessageSendType.KAKAO &&
+      o.type === MessageType.FULLY_CUSTOM,
+  )
+  @IsNotEmpty()
   @ValidateNested()
   @Type(() => CreateKakaoTemplateBodyDto)
   kakaoTemplate?: CreateKakaoTemplateBodyDto;

@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { Prisma } from '@prisma/client';
+import { MessageSendType, MessageType, Prisma } from '@prisma/client';
 import { Expose, Exclude } from 'class-transformer';
 
 export class MessagesDto {
@@ -19,10 +19,19 @@ export class MessagesDto {
 
   @Expose()
   @ApiProperty({
-    description: '전역 여부',
-    example: false,
+    description: '메시지 발송 타입',
+    example: MessageSendType.KAKAO,
+    enum: MessageSendType,
   })
-  isGlobal: boolean;
+  sendType: MessageSendType;
+
+  @Expose()
+  @ApiProperty({
+    description: '메시지 타입',
+    example: MessageType.FULLY_CUSTOM,
+    enum: MessageType,
+  })
+  type: MessageType;
 
   @Exclude()
   variables: Prisma.JsonValue;

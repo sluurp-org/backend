@@ -241,7 +241,6 @@ export class ContentService {
         data: { status },
       });
     }
-
     if (!text) throw new BadRequestException('수정할 값이 없습니다.');
 
     this.validateContentGroupType(group.type, text);

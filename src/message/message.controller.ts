@@ -13,6 +13,7 @@ import { FindMessageQueryDto } from './dto/req/find-message-query.dto';
 import { UpdateMessageBodyDto } from './dto/req/update-message-body.dto';
 import { MessageDto } from './dto/res/message.dto';
 import { VariablesDto } from './dto/res/variables.dto';
+import { CustomKakaoTemplatesDto } from './dto/res/custom-kakao.dto';
 
 @ApiTags('message')
 @WorkspaceController('message')
@@ -54,6 +55,22 @@ export class MessageController {
       nodes,
       total,
     };
+  }
+
+  @Get('custom/kakao')
+  @ApiOperation({
+    summary: '사용 가능한 카카오 커스텀 템플릿 조회',
+    description: '사용 가능한 카카오 커스텀 템플릿을 조회합니다.',
+  })
+  @Serialize(CustomKakaoTemplatesDto)
+  @ApiResponse({
+    status: 200,
+    description: '사용 가능한 카카오 커스텀 템플릿 조회 성공',
+    type: CustomKakaoTemplatesDto,
+  })
+  @WorkspaceAuth([WorkspaceRole.OWNER, WorkspaceRole.MEMBER])
+  public async getCustomKakaoTemplates() {
+    return this.messageService.findCustomKakaoTemplates();
   }
 
   @Get(':messageId')

@@ -235,7 +235,7 @@ export class EventHistoryDto {
     description: '이벤트 메시지',
     example: '이벤트 발송 대기',
   })
-  message: string;
+  rawMessage: string;
 
   @Expose()
   @ApiProperty({

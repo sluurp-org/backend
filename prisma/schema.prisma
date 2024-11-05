@@ -373,12 +373,11 @@ enum ContentStatus {
 }
 
 model Event {
-  id               Int     @id @default(autoincrement())
+  id               Int  @id @default(autoincrement())
   workspaceId      Int
   productId        Int?
   productVariantId Int?
   messageId        Int
-  isGlobal         Boolean @default(false)
 
   type OrderStatus
 
@@ -497,13 +496,14 @@ enum MessageTarget {
 
 model KakaoTemplate {
   id                Int                 @id @default(autoincrement())
+  name              String?
+  description       String?
   templateId        String              @unique
   status            KakaoTemplateStatus @default(PENDING)
   isCustomAvailable Boolean             @default(false) // 커스텀 메시지 사용 가능 여부
 
   categoryCode String
-  content      String  @db.LongText
-  isGlobal     Boolean @default(false)
+  content      String @db.LongText
 
   /// [KakaoTemplateButtons]
   buttons Json?

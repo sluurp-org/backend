@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, StoreType } from '@prisma/client';
+import { Prisma, SmartStoreCredentials, StoreType } from '@prisma/client';
 import { FindStoreQueryDto } from './dto/req/find-store-query.dto';
 import { CreateStoreBodyDto } from './dto/req/create-store-body.dto';
 import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
@@ -366,6 +366,22 @@ export class StoreService {
     });
   }
 
+  private async generateSmartStorePayload(
+    smartStoreCredentials: SmartStoreCredentials,
+  ) {
+    const { applicationId, applicationSecret, emailParseable } =
+      smartStoreCredentials;
+
+    return {
+      payload: {
+        applicationId,
+        applicationSecret,
+        emailParseable,
+      },
+      provider: 'SMARTSTORE',
+    };
+  }
+
   public async sendStoreToSqs() {
     const stores = await this.prismaService.store.findMany({
       where: {
@@ -382,20 +398,25 @@ export class StoreService {
     });
 
     const sqsPayload = stores
-      .filter((store) => store.smartStoreCredentials !== null)
-      .map((store) => ({
-        id: store.id.toString() + new Date().getTime().toString(),
-        body: JSON.stringify({
-          payload: {
-            applicationId: store.smartStoreCredentials?.applicationId,
-            applicationSecret: store.smartStoreCredentials?.applicationSecret,
-            emailParseable: store.smartStoreCredentials?.emailParseable,
-          },
-          lastSyncedAt: store.lastOrderSyncAt,
-          provider: 'SMARTSTORE',
-          storeId: store.id,
-        }),
-      }));
+      .map((store) => {
+        if (
+          store.type === StoreType.SMARTSTORE &&
+          store.smartStoreCredentials
+        ) {
+          return {
+            id: store.id.toString() + new Date().getTime().toString(),
+            body: JSON.stringify({
+              payload: this.generateSmartStorePayload(
+                store.smartStoreCredentials,
+              ),
+              lastSyncedAt: store.lastOrderSyncAt,
+              provider: 'SMARTSTORE',
+              storeId: store.id,
+            }),
+          };
+        }
+      })
+      .filter((payload) => !!payload);
 
     console.log(`Sending ${sqsPayload.length} messages to SQS`);
     await this.sqsService.send('commerce', sqsPayload);

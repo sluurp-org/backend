@@ -6,6 +6,7 @@ import { UpdateEventBodyDto } from './dto/req/update-event-body.dto';
 import { FindEventHistoryQueryDto } from './dto/req/find-event-history-query.dto';
 import {
   EventStatus,
+  MessageTarget,
   Order,
   OrderHistoryType,
   Prisma,
@@ -156,14 +157,48 @@ export class EventService {
   ): Promise<
     Pick<
       Prisma.EventHistoryCreateInput,
-      'event' | 'order' | 'contents' | 'status' | 'message' | 'rawMessage'
+      | 'event'
+      | 'order'
+      | 'contents'
+      | 'status'
+      | 'message'
+      | 'rawMessage'
+      | 'receiverPhone'
+      | 'receiverEmail'
     >
   > {
-    const { id: orderId, receiverPhone, quantity } = order;
+    const {
+      id: orderId,
+      ordererPhone,
+      receiverPhone: orderReceiverPhone,
+      quantity,
+    } = order;
     const {
       id: eventId,
-      message: { id: messageId, contentGroup },
+      message: { id: messageId, contentGroup, target, customPhone },
     } = event;
+
+    let receiverPhone = orderReceiverPhone;
+
+    if (target === MessageTarget.CUSTOM && customPhone)
+      receiverPhone = customPhone;
+
+    if (target === MessageTarget.BUYER && ordererPhone)
+      receiverPhone = ordererPhone;
+
+    if (target === MessageTarget.RECEIVER && orderReceiverPhone)
+      receiverPhone = orderReceiverPhone;
+
+    const defaultInput: Pick<
+      Prisma.EventHistoryCreateInput,
+      'message' | 'event' | 'order' | 'status' | 'receiverPhone'
+    > = {
+      message: { connect: { id: messageId } },
+      event: { connect: { id: eventId } },
+      order: { connect: { id: orderId } },
+      status: EventStatus.FAILED,
+      receiverPhone,
+    };
 
     if (contentGroup) {
       try {
@@ -188,9 +223,8 @@ export class EventService {
         }
 
         return {
-          message: { connect: { id: messageId } },
-          event: { connect: { id: eventId } },
-          order: { connect: { id: orderId } },
+          ...defaultInput,
+          status: EventStatus.CONTENT_READY,
           contents: {
             createMany: {
               data: contents.map(({ id, contentGroup }) => ({
@@ -200,13 +234,10 @@ export class EventService {
               })),
             },
           },
-          status: EventStatus.CONTENT_READY,
         };
       } catch (error) {
         return {
-          event: { connect: { id: eventId } },
-          order: { connect: { id: orderId } },
-          status: EventStatus.FAILED,
+          ...defaultInput,
           rawMessage: error.message,
         };
       }
@@ -214,25 +245,19 @@ export class EventService {
 
     if (!receiverPhone)
       return {
-        event: { connect: { id: eventId } },
-        order: { connect: { id: orderId } },
+        ...defaultInput,
         rawMessage: '수신자 전화번호가 유효하지 않습니다.',
-        status: EventStatus.FAILED,
       };
 
     try {
       return {
-        message: { connect: { id: messageId } },
-        event: { connect: { id: eventId } },
-        order: { connect: { id: orderId } },
+        ...defaultInput,
         status: EventStatus.CONTENT_READY,
       };
     } catch (error) {
       return {
-        event: { connect: { id: eventId } },
-        order: { connect: { id: orderId } },
-        status: EventStatus.FAILED,
-        message: error.message,
+        ...defaultInput,
+        rawMessage: error.message,
       };
     }
   }
@@ -273,13 +298,7 @@ export class EventService {
                 },
               },
             },
-            include: {
-              message: {
-                include: {
-                  kakaoTemplate: true,
-                },
-              },
-            },
+            include: { message: { include: { kakaoTemplate: true } } },
           });
 
           return {
@@ -288,6 +307,26 @@ export class EventService {
           };
         }),
       );
+    });
+  }
+
+  private replaceVariables(
+    content: string,
+    variables: Record<string, string>,
+    availableVariables: Variables[],
+  ) {
+    const keyToVarName = availableVariables.reduce((acc, { key, value }) => {
+      acc[key] = value;
+      return acc;
+    }, {});
+
+    return content.replace(/#\{([^}]+)\}/g, (match, p1) => {
+      const varName = keyToVarName[p1];
+      if (varName && variables[varName] !== undefined) {
+        return variables[varName] || '-';
+      } else {
+        return match || '-';
+      }
     });
   }
 
@@ -311,16 +350,14 @@ export class EventService {
     variables: Variables[],
   ): Prisma.EventHistoryUpdateInput {
     const { message, id: eventHistoryId } = eventHistory;
-    if (!message?.kakaoTemplate) {
-      throw new Error('메시지가 존재하지 않습니다.');
-    }
+    if (!message?.kakaoTemplate) throw new Error('메시지가 존재하지 않습니다.');
 
     const { kakaoTemplate } = message;
     const { product, productVariant, store, orderAt, ...orderRest } = order;
 
     const variableBody = {
-      storeName: store.name,
-      eventId: eventHistoryId,
+      storeName: store.name || '-',
+      eventId: eventHistoryId.toString() || '-',
       productName: product?.name || '-',
       productVariantName: productVariant?.name || '-',
       orderAt: orderAt
@@ -328,16 +365,31 @@ export class EventService {
             locale: ko,
           })
         : '-',
-      ...orderRest,
+      ...Object.fromEntries(
+        Object.entries(orderRest).map(([key, value]) => [
+          key,
+          value?.toString() || '-',
+        ]),
+      ),
     };
 
     const messageVariables = variables.reduce((acc, variable) => {
       const { key, value } = variable;
       return {
         ...acc,
-        [`#{${key}}`]: variableBody[value],
+        [`#{${key}}`]: variableBody[value] || '-',
       };
     }, []);
+
+    if (kakaoTemplate.isCustomAvailable) {
+      const replacedContent = this.replaceVariables(
+        kakaoTemplate.content,
+        variableBody,
+        variables,
+      );
+
+      messageVariables['#{상품안내}'] = replacedContent;
+    }
 
     return {
       messageContent: kakaoTemplate.content,
@@ -375,7 +427,6 @@ export class EventService {
     if (!availableEvents.length) return;
 
     const variables = await this.prismaService.variables.findMany();
-
     const messageBodies = await Promise.all(
       availableEvents.map(async (eventPayload) => {
         try {

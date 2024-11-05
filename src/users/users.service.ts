@@ -176,6 +176,16 @@ export class UsersService {
         where: { id: phoneVerification.id },
       });
 
+      await this.kakaoService.sendKakaoMessage([
+        {
+          to: phone,
+          templateId: 'KA01TP2411031303212274F0PV0H5O5j',
+          variables: {
+            '#{고객명}': user.name,
+          },
+        },
+      ]);
+
       return user;
     } catch (error) {
       this.logger.error(error.message);

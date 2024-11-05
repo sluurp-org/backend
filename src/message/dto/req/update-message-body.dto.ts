@@ -45,12 +45,30 @@ export class UpdateMessageBodyDto {
   completeDelivery?: boolean;
 
   @ApiProperty({
+    description: '카카오 템플릿 ID',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  kakaoTemplateId?: number;
+
+  @ApiProperty({
+    description: '콘텐츠',
+    example: '주문이 완료되었습니다.',
+    required: false,
+  })
+  @IsString()
+  @IsOptional()
+  content?: string;
+
+  @ApiProperty({
     description: '카카오 템플릿 정보',
     required: false,
     type: CreateKakaoTemplateBodyDto,
   })
-  @IsOptional()
   @Type(() => CreateKakaoTemplateBodyDto)
+  @IsOptional()
   @ValidateNested()
   kakaoTemplate?: UpdateKakaoTemplateBodyDto;
 

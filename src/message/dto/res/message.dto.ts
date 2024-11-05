@@ -2,7 +2,9 @@ import { ApiProperty } from '@nestjs/swagger';
 import {
   ContentType,
   KakaoTemplateStatus,
+  MessageSendType,
   MessageTarget,
+  MessageType,
 } from '@prisma/client';
 import { Expose, Exclude, Type } from 'class-transformer';
 import { KakaoTemplateButtonType } from '../req/subtemplate/create-kakao-template-body.dto';
@@ -180,6 +182,29 @@ export class MessageDto {
 
   @Expose()
   @ApiProperty({
+    description: '메시지 전송 타입',
+    enum: MessageSendType,
+    example: MessageSendType.KAKAO,
+  })
+  sendType: MessageSendType;
+
+  @Expose()
+  @ApiProperty({
+    description: '메시지 타입',
+    enum: MessageType,
+    example: MessageType.FULLY_CUSTOM,
+  })
+  type: MessageType;
+
+  @Expose()
+  @ApiProperty({
+    description: '메시지 내용',
+    example: '주문이 완료되었습니다.',
+  })
+  content?: string;
+
+  @Expose()
+  @ApiProperty({
     description: '컨텐츠 그룹',
     type: MessageContentGroupDto,
     nullable: true,
@@ -243,8 +268,12 @@ export class MessageDto {
   @Exclude()
   workspaceId: number;
 
-  @Exclude()
-  kakaoTemplateId: string;
+  @Expose()
+  @ApiProperty({
+    description: '카카오 템플릿 ID',
+    example: '1234',
+  })
+  kakaoTemplateId: number;
 
   @Exclude()
   deletedAt: Date;

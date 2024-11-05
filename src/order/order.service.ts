@@ -388,7 +388,7 @@ export class OrderService {
         OR: [
           ...(productId ? [{ productId }] : []),
           ...(productVariantId ? [{ productVariantId }] : []),
-          ...(disableGlobalEvent
+          ...(!disableGlobalEvent
             ? [{ productId: null, productVariantId: null }]
             : []),
         ],
@@ -539,7 +539,6 @@ export class OrderService {
           });
 
         await this.createChangeOrderHistory(orderHistory, transaction);
-
         const orderEvents = updatedOrders
           .filter((result) => result.status === 'fulfilled')
           .map((result) => result.value);

@@ -366,7 +366,7 @@ export class StoreService {
     });
   }
 
-  private async generateSmartStorePayload(
+  private generateSmartStorePayload(
     smartStoreCredentials: SmartStoreCredentials,
   ) {
     const { applicationId, applicationSecret, emailParseable } =
@@ -406,11 +406,8 @@ export class StoreService {
           return {
             id: store.id.toString() + new Date().getTime().toString(),
             body: JSON.stringify({
-              payload: this.generateSmartStorePayload(
-                store.smartStoreCredentials,
-              ),
+              ...this.generateSmartStorePayload(store.smartStoreCredentials),
               lastSyncedAt: store.lastOrderSyncAt,
-              provider: 'SMARTSTORE',
               storeId: store.id,
             }),
           };

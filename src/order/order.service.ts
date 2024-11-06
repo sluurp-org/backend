@@ -381,7 +381,7 @@ export class OrderService {
     type: OrderStatus,
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
-    const events = await transaction.event.findMany({
+    return transaction.event.findMany({
       where: {
         workspaceId,
         type,
@@ -397,8 +397,6 @@ export class OrderService {
         message: { include: { contentGroup: true } },
       },
     });
-
-    return events.filter((event) => !event.message.contentGroup);
   }
 
   private async processBatchUpdateOrder(

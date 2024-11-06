@@ -5,7 +5,7 @@ import {
   RequestMethod,
 } from '@nestjs/common';
 import { ConfigModule, ConfigService } from '@nestjs/config';
-import { TelegrafModule } from 'nestjs-telegraf';
+// import { TelegrafModule } from 'nestjs-telegraf';
 import { WorkspaceMiddleware } from './workspace/middleware/workspace.middleware';
 import { WorkspaceModule } from './workspace/workspace.module';
 import { ProductModule } from './product/product.module';
@@ -56,13 +56,13 @@ import { AnalyticsModule } from './analytics/analytics.module';
         ],
       }),
     }),
-    TelegrafModule.forRootAsync({
-      imports: [ConfigModule],
-      inject: [ConfigService],
-      useFactory: async (configService: ConfigService) => ({
-        token: configService.getOrThrow('TELEGRAM_BOT_TOKEN'),
-      }),
-    }),
+    // TelegrafModule.forRootAsync({
+    //   imports: [ConfigModule],
+    //   inject: [ConfigService],
+    //   useFactory: async (configService: ConfigService) => ({
+    //     token: configService.getOrThrow('TELEGRAM_BOT_TOKEN'),
+    //   }),
+    // }),
     KakaoModule,
     WorkspaceModule,
     UsersModule,

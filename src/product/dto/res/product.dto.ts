@@ -23,7 +23,7 @@ export class ProductDto {
     description: '상품 이미지',
   })
   @Expose()
-  productImage: string;
+  productImageUrl: string;
 
   @ApiProperty({
     example: '1',

@@ -8,7 +8,7 @@ import { ProductVariantDto } from 'src/product/dto/res/product-variant.dto';
 export class OrderStoreDto extends PickType(ProductDto, [
   'id',
   'name',
-  'productImage',
+  'productImageUrl',
   'productId',
 ]) {}
 

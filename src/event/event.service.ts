@@ -352,7 +352,7 @@ export class EventService {
     const { message, id: eventHistoryId } = eventHistory;
     if (!message?.kakaoTemplate) throw new Error('메시지가 존재하지 않습니다.');
 
-    const { kakaoTemplate } = message;
+    const { kakaoTemplate, content } = message;
     const { product, productVariant, store, orderAt, ...orderRest } = order;
 
     const variableBody = {
@@ -383,7 +383,7 @@ export class EventService {
 
     if (kakaoTemplate.isCustomAvailable) {
       const replacedContent = this.replaceVariables(
-        kakaoTemplate.content,
+        content || '-',
         variableBody,
         variables,
       );

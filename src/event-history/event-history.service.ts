@@ -14,7 +14,7 @@ export class EventHistoryService {
     private readonly awsService: AwsService,
   ) {}
 
-  private async validateContent(
+  private validateContent(
     contentConnection: Prisma.EventHistoryContentConnectionGetPayload<{
       include: {
         content: true;
@@ -104,42 +104,53 @@ export class EventHistoryService {
     eventHistoryId: string,
     eventHistoryContentId: number,
   ) {
-    const contentConnection =
-      await this.prisma.eventHistoryContentConnection.findUnique({
-        where: { id: eventHistoryContentId, eventHistoryId },
-        include: {
-          content: true,
+    return this.prisma.$transaction(async (transaction) => {
+      const contentConnection =
+        await transaction.eventHistoryContentConnection.findUnique({
+          where: { id: eventHistoryContentId, eventHistoryId },
+          include: {
+            content: true,
+          },
+        });
+
+      if (!contentConnection || !contentConnection.content)
+        throw new NotFoundException('존재하지 않는 콘텐츠 입니다.');
+
+      const { error } = await this.validateContent(contentConnection);
+      if (error) throw new ForbiddenException(error);
+
+      await transaction.eventHistoryContentConnection.update({
+        where: { id: contentConnection.id },
+        data: {
+          downloadCount: { increment: 1 },
+          firstDownloadAt: contentConnection.firstDownloadAt || new Date(),
+          lastDownloadAt: new Date(),
         },
       });
 
-    if (!contentConnection || !contentConnection.content)
-      throw new NotFoundException('존재하지 않는 콘텐츠 입니다.');
-
-    const { error } = await this.validateContent(contentConnection);
-    if (error) throw new ForbiddenException(error);
-
-    const {
-      id: contentId,
-      name,
-      text,
-      extension,
-      contentGroupId,
-      type,
-    } = contentConnection.content;
-
-    if (type === ContentType.FILE) {
-      const key = `${contentGroupId}/${contentId}`;
-      const encodedName = encodeURIComponent(name || '주문 파일');
-      const url = await this.awsService.createDownloadPresignedUrl(
-        key,
-        encodedName,
+      const {
+        id: contentId,
+        name,
+        text,
         extension,
-      );
+        contentGroupId,
+        type,
+      } = contentConnection.content;
 
-      return { url, type };
-    }
+      if (type === ContentType.FILE) {
+        const key = `${contentGroupId}/${contentId}`;
+        const encodedName = encodeURIComponent(name || '주문 파일');
+        const url = await this.awsService.createDownloadPresignedUrl(
+          key,
+          encodedName,
+          extension,
+        );
 
-    return { text, type };
+        return { url, type };
+      }
+
+      return { text, type };
+    });
   }
 
   public async getPurchaseConfirmRedirectUrl(eventHistoryId: string) {

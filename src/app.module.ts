@@ -53,11 +53,6 @@ import { AnalyticsModule } from './analytics/analytics.module';
             region: configService.getOrThrow('AWS_REGION'),
             queueUrl: configService.getOrThrow('COMMERCE_SQS_QUEUE_URL'),
           },
-          {
-            name: 'event',
-            region: configService.getOrThrow('AWS_REGION'),
-            queueUrl: configService.getOrThrow('EVENT_SQS_QUEUE_URL'),
-          },
         ],
       }),
     }),

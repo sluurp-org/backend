@@ -207,6 +207,7 @@ export class ContentService {
         workspaceId: id,
         contentGroupId: group.id,
         ...dto,
+        type: ContentType.FILE,
         status: ContentStatus.PENDING,
       },
     });

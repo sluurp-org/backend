@@ -246,6 +246,13 @@ export class EventHistoryDto {
 
   @Expose()
   @ApiProperty({
+    description: '이벤트 메시지 변수',
+    example: { name: '홍길동' },
+  })
+  messageVariables: Record<string, string>;
+
+  @Expose()
+  @ApiProperty({
     description: '이벤트 처리 날짜',
     example: '2024-01-01',
   })

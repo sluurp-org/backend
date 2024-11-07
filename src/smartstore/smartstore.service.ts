@@ -13,6 +13,7 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { Content, ProductResponse } from './interfaces/products.interface';
 import { ProductDetails } from './interfaces/product.interface';
 import { isAxiosError } from 'axios';
+import { KakaoService } from 'src/kakao/kakao.service';
 
 @Injectable()
 export class SmartstoreService {
@@ -20,6 +21,7 @@ export class SmartstoreService {
   constructor(
     private readonly httpService: HttpService,
     private readonly prismaService: PrismaService,
+    private readonly kakaoService: KakaoService,
   ) {}
 
   private async handleCommerceError(error: unknown, applicationId: string) {
@@ -284,16 +286,77 @@ export class SmartstoreService {
         throw new InternalServerErrorException(
           '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
         );
-      if (error?.response?.status === 403)
+      if (error?.response?.status === 403) {
+        await this.expiredSmartstoreToken(
+          applicationId,
+          '유효하지 않은 인증 정보 입니다. 새로운 인증 정보를 등록해주세요.',
+        );
         throw new ForbiddenException('유효하지 않는 접근 권한입니다.');
+      }
 
-      if (error?.response?.status === 400)
-        throw new BadRequestException('유효하지 않은 입력 정보입니다.');
+      if (error?.response?.status === 400) {
+        await this.expiredSmartstoreToken(
+          applicationId,
+          '잘못된 요청입니다. 고객센터에 문의해주세요.',
+        );
+        throw new BadRequestException('잘못된 요청입니다.');
+      }
 
       throw new InternalServerErrorException(
         '네이버 커머스 서버에서 오류가 발생했습니다. 잠시만 기다려주세요.',
       );
     }
+  }
+
+  private async expiredSmartstoreToken(applicationId: string, reason: string) {
+    if (!applicationId)
+      throw new BadRequestException('applicationId를 찾을 수 없습니다.');
+
+    const targetUsers = await this.prismaService.store.findMany({
+      where: {
+        smartStoreCredentials: { applicationId },
+        deletedAt: null,
+        enabled: true,
+      },
+      include: {
+        workspace: {
+          include: { workspaceUser: { include: { user: true } } },
+        },
+      },
+    });
+
+    if (targetUsers.length === 0) return;
+    try {
+      const messages = targetUsers
+        .map((item) =>
+          item.workspace.workspaceUser.map(({ user }) => {
+            return {
+              to: user.phone,
+              templateId: 'KA01TP241103083701188oSf6ZShyoQ2',
+              variables: {
+                '#{고객명}': user.name,
+                '#{워크스페이스명}': item.workspace.name,
+                '#{스토어명}': item.name,
+                '#{사유}': reason,
+                '#{워크스페이스아이디}': item.workspaceId,
+                '#{스토어아이디}': item.id,
+              },
+            };
+          }),
+        )
+        .flat();
+
+      await this.kakaoService.sendKakaoMessage(messages);
+    } catch (error) {
+      this.logger.error(error);
+    }
+
+    await this.prismaService.store.updateMany({
+      where: { smartStoreCredentials: { applicationId } },
+      data: {
+        enabled: false,
+      },
+    });
   }
 
   private hashToken(

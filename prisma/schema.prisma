@@ -227,6 +227,11 @@ model ProductVariant {
   @@unique([variantId, productId])
 }
 
+enum OrderCreatedBy {
+  USER
+  SYSTEM
+}
+
 model Order {
   id Int @id @default(autoincrement())
 
@@ -255,6 +260,8 @@ model Order {
   deliveryMessage        String?
   deliveryCompany        String?
   deliveryTrackingNumber String?
+
+  createdBy OrderCreatedBy @default(SYSTEM)
 
   product        Product         @relation(fields: [productId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])

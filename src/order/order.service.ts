@@ -5,7 +5,13 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Order, OrderHistoryType, OrderStatus, Prisma } from '@prisma/client';
+import {
+  Order,
+  OrderCreatedBy,
+  OrderHistoryType,
+  OrderStatus,
+  Prisma,
+} from '@prisma/client';
 import { FindOrderQueryDto } from './dto/req/find-order-query.dto';
 import { FindOrdersBatchBodyDto } from './dto/req/find-orders-batch-body.dto';
 import {
@@ -143,6 +149,7 @@ export class OrderService {
         workspaceId,
         status,
         storeId,
+        createdBy: OrderCreatedBy.SYSTEM,
         deletedAt: null,
         store: {
           deletedAt: null,

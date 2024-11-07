@@ -4,9 +4,11 @@ import { HttpModule } from '@nestjs/axios';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SmartstoreController } from './smartstore.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
+import { KakaoModule } from 'src/kakao/kakao.module';
 
 @Module({
   imports: [
+    KakaoModule,
     HttpModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

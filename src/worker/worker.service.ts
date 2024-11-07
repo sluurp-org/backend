@@ -1,9 +1,4 @@
-import {
-  BadRequestException,
-  Injectable,
-  Logger,
-  NotAcceptableException,
-} from '@nestjs/common';
+import { Injectable, Logger, NotAcceptableException } from '@nestjs/common';
 import {
   EventStatus,
   KakaoTemplateStatus,
@@ -61,57 +56,6 @@ export class WorkerService {
       applicationId,
       applicationSecret,
     );
-  }
-
-  public async expiredSmartstoreToken(applicationId: string) {
-    if (!applicationId)
-      throw new BadRequestException('applicationId를 찾을 수 없습니다.');
-
-    const targetUsers = await this.prismaService.store.findMany({
-      where: {
-        smartStoreCredentials: { applicationId },
-        deletedAt: null,
-        enabled: true,
-      },
-      include: {
-        workspace: {
-          include: { workspaceUser: { include: { user: true } } },
-        },
-      },
-    });
-
-    if (targetUsers.length > 0)
-      try {
-        await this.kakaoService.sendKakaoMessage(
-          targetUsers
-            .map((item) =>
-              item.workspace.workspaceUser.map(({ user }) => {
-                return {
-                  to: user.phone,
-                  templateId: 'KA01TP241103083701188oSf6ZShyoQ2',
-                  variables: {
-                    '#{고객명}': user.name,
-                    '#{워크스페이스명}': item.workspace.name,
-                    '#{스토어명}': item.name,
-                    '#{사유}': '토큰 만료',
-                    '#{워크스페이스아이디}': item.workspaceId,
-                    '#{스토어아이디}': item.id,
-                  },
-                };
-              }),
-            )
-            .flat(),
-        );
-      } catch (error) {
-        this.logger.error(error);
-      }
-
-    await this.prismaService.store.updateMany({
-      where: { smartStoreCredentials: { applicationId } },
-      data: {
-        enabled: false,
-      },
-    });
   }
 
   public async updateStoreLastSyncedAt(

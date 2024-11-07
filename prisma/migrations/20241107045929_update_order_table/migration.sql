@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `Order` ADD COLUMN `createdBy` ENUM('USER', 'SYSTEM') NOT NULL DEFAULT 'SYSTEM';

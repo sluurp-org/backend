@@ -6,9 +6,16 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { PortoneModule } from 'src/portone/portone.module';
 import { TelegramModule } from 'src/telegram/telegram.module';
 import { PurchaseController } from './purchase.controller';
+import { KakaoModule } from 'src/kakao/kakao.module';
 
 @Module({
-  imports: [WorkspaceModule, PrismaModule, PortoneModule, TelegramModule],
+  imports: [
+    WorkspaceModule,
+    PrismaModule,
+    PortoneModule,
+    TelegramModule,
+    KakaoModule,
+  ],
   controllers: [PurchaseWorkspaceController, PurchaseController],
   providers: [PurchaseService],
   exports: [PurchaseService],

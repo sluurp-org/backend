@@ -14,6 +14,7 @@ import { Content, ProductResponse } from './interfaces/products.interface';
 import { ProductDetails } from './interfaces/product.interface';
 import { isAxiosError } from 'axios';
 import { KakaoService } from 'src/kakao/kakao.service';
+import { WorkspaceService } from 'src/workspace/workspace.service';
 
 @Injectable()
 export class SmartstoreService {
@@ -22,6 +23,7 @@ export class SmartstoreService {
     private readonly httpService: HttpService,
     private readonly prismaService: PrismaService,
     private readonly kakaoService: KakaoService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   private async handleCommerceError(error: unknown, applicationId: string) {
@@ -312,41 +314,38 @@ export class SmartstoreService {
     if (!applicationId)
       throw new BadRequestException('applicationId를 찾을 수 없습니다.');
 
-    const targetUsers = await this.prismaService.store.findMany({
+    const targetStores = await this.prismaService.store.findMany({
       where: {
         smartStoreCredentials: { applicationId },
         deletedAt: null,
         enabled: true,
       },
-      include: {
-        workspace: {
-          include: { workspaceUser: { include: { user: true } } },
-        },
-      },
     });
+    if (targetStores.length === 0) return;
 
-    if (targetUsers.length === 0) return;
     try {
-      const messages = targetUsers
-        .map((item) =>
-          item.workspace.workspaceUser.map(({ user }) => {
+      const messages = await Promise.all(
+        targetStores.map(async (message) => {
+          const targetWorkspace =
+            await this.workspaceService.getWorkspaceOwners(message.workspaceId);
+          if (!targetWorkspace) return;
+
+          return targetWorkspace.workspaceUser.map(({ user }) => {
             return {
               to: user.phone,
               templateId: 'KA01TP241103083701188oSf6ZShyoQ2',
               variables: {
                 '#{고객명}': user.name,
-                '#{워크스페이스명}': item.workspace.name,
-                '#{스토어명}': item.name,
                 '#{사유}': reason,
-                '#{워크스페이스아이디}': item.workspaceId,
-                '#{스토어아이디}': item.id,
               },
             };
-          }),
-        )
-        .flat();
+          });
+        }),
+      );
 
-      await this.kakaoService.sendKakaoMessage(messages);
+      await this.kakaoService.sendKakaoMessage(
+        messages.flat().filter((item) => item !== undefined),
+      );
     } catch (error) {
       this.logger.error(error);
     }

@@ -5,10 +5,12 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { SmartstoreController } from './smartstore.controller';
 import { PrismaModule } from 'src/prisma/prisma.module';
 import { KakaoModule } from 'src/kakao/kakao.module';
+import { WorkspaceModule } from 'src/workspace/workspace.module';
 
 @Module({
   imports: [
     KakaoModule,
+    WorkspaceModule,
     HttpModule.registerAsync({
       imports: [ConfigModule],
       inject: [ConfigService],

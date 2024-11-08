@@ -8,6 +8,7 @@ import { PrismaModule } from 'src/prisma/prisma.module';
 import { PurchaseModule } from 'src/purchase/purchase.module';
 import { KakaoModule } from 'src/kakao/kakao.module';
 import { AnalyticsModule } from 'src/analytics/analytics.module';
+import { WorkspaceModule } from 'src/workspace/workspace.module';
 
 @Module({
   imports: [
@@ -19,6 +20,7 @@ import { AnalyticsModule } from 'src/analytics/analytics.module';
     PurchaseModule,
     KakaoModule,
     AnalyticsModule,
+    WorkspaceModule,
   ],
   controllers: [WorkerController],
   providers: [WorkerService],

@@ -427,6 +427,7 @@ export class KakaoService {
       );
     } catch (error) {
       this.logger.error(error);
+
       await this.telegramService.sendMessage({
         fetal: true,
         message: `카카오 메시지 전송에 실패했습니다.\n\n${JSON.stringify(messages)}`,

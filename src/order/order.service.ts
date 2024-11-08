@@ -171,6 +171,7 @@ export class OrderService {
         orderAt: orderAt || new Date(),
         receiverName: receiverName || ordererName,
         receiverPhone: receiverPhone || ordererPhone,
+        createdBy: OrderCreatedBy.USER,
       },
       include: {
         product: true,

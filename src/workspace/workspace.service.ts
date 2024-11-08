@@ -60,7 +60,7 @@ export class WorkspaceService {
     try {
       return await this.prismaService.$transaction(async (tx) => {
         const nextPurchaseAt = new Date();
-        nextPurchaseAt.setDate(nextPurchaseAt.getDate() + 14);
+        nextPurchaseAt.setDate(nextPurchaseAt.getDate() + 30);
         nextPurchaseAt.setHours(0, 0, 0, 0);
 
         const workspace = await tx.workspace.create({
@@ -250,6 +250,27 @@ export class WorkspaceService {
       this.logger.error(error);
       throw new InternalServerErrorException(
         '워크스페이스 사용자 조회에 실패했습니다.',
+      );
+    }
+  }
+
+  public async getWorkspaceOwners(workspaceId: number) {
+    try {
+      const workspace = await this.prismaService.workspace.findUnique({
+        where: { id: workspaceId },
+        include: {
+          workspaceUser: {
+            where: { role: WorkspaceRole.OWNER },
+            include: { user: true },
+          },
+        },
+      });
+
+      return workspace;
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException(
+        '워크스페이스 관리자 조회에 실패했습니다.',
       );
     }
   }

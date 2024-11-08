@@ -19,6 +19,7 @@ import { KakaoTemplateStatusBodyDto } from './dto/req/kakao-template-status-body
 import { PrismaService } from 'src/prisma/prisma.service';
 import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.dto';
 import { KakaoService } from 'src/kakao/kakao.service';
+import { WorkspaceService } from 'src/workspace/workspace.service';
 
 @Injectable()
 export class WorkerService {
@@ -30,6 +31,7 @@ export class WorkerService {
     private readonly storeService: StoreService,
     private readonly prismaService: PrismaService,
     private readonly kakaoService: KakaoService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   public async findOrdersByBatchQuery(
@@ -86,9 +88,6 @@ export class WorkerService {
             kakaoTemplate: {
               where: { status: KakaoTemplateStatus.APPROVED },
             },
-            workspace: {
-              include: { workspaceUser: { include: { user: true } } },
-            },
           },
         },
       },
@@ -101,25 +100,28 @@ export class WorkerService {
       [KakaoTemplateStatus.UPLOADED]: '등록',
     };
 
-    const sendMessages = updatedTemplate.message
-      .map(({ id, workspaceId, workspace }) =>
-        workspace?.workspaceUser.map(({ user }) => {
-          return {
-            to: user.phone,
-            templateId: 'KA01TP241101140418410t4UY9irGh7E',
-            variables: {
-              '#{고객명}': user.name,
-              '#{상태}': mapStatus[status],
-              '#{워크스페이스_아이디}': workspaceId,
-              '#{메시지_아이디}': id,
-            },
-          };
-        }),
-      )
-      .flat()
-      .filter((message) => message !== undefined);
+    const kakaoAlertMessgaes = await Promise.all(
+      updatedTemplate.message.map(async ({ id, workspaceId }) => {
+        if (!workspaceId) return;
+        const workspace =
+          await this.workspaceService.getWorkspaceOwners(workspaceId);
 
-    await this.kakaoService.sendKakaoMessage(sendMessages);
+        return workspace?.workspaceUser.map(({ user }) => ({
+          to: user.phone,
+          templateId: 'KA01TP241101140418410t4UY9irGh7E',
+          variables: {
+            '#{고객명}': user.name,
+            '#{상태}': mapStatus[status],
+            '#{워크스페이스_아이디}': workspaceId,
+            '#{메시지_아이디}': id,
+          },
+        }));
+      }),
+    );
+
+    await this.kakaoService.sendKakaoMessage(
+      kakaoAlertMessgaes.flat().filter((item) => item !== undefined),
+    );
   }
 
   private extractTemplateStatus(message: string) {

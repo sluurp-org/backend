@@ -139,8 +139,6 @@ export class PortoneService {
         if (error.response?.status === 409) {
           throw new ConflictException('결제가 이미 완료되었습니다.');
         }
-
-        console.log(error?.response?.data);
       }
 
       throw new InternalServerErrorException('결제 요청에 실패했습니다.');

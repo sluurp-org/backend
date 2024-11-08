@@ -481,7 +481,6 @@ export class PurchaseService {
               ordererName: workspaceName,
               amount: totalAmount,
             },
-            JSON.stringify({ retry: 0 }),
           );
 
           const updatedPurchaseHistory =
@@ -575,11 +574,10 @@ export class PurchaseService {
     purchase: Prisma.PurchaseHistoryGetPayload<{
       include: { workspace: true };
     }>,
-    customData: string,
   ) {
-    const { retry } = JSON.parse(customData);
-    await this.purchaseFailedAlert(purchase.workspace.id);
+    const { retry } = purchase;
 
+    if (retry > 0) await this.purchaseFailedAlert(purchase.workspace.id);
     if (retry >= this.MAX_RETRY_COUNT) {
       await this.prismaService.purchaseHistory.update({
         where: { id: purchase.id },
@@ -663,7 +661,6 @@ export class PurchaseService {
           ordererName: purchase.workspace.name,
           amount: purchase.totalAmount,
         },
-        JSON.stringify({ retry: retryCount }),
       );
 
       return await this.prismaService.purchaseHistory.update({
@@ -732,7 +729,7 @@ export class PurchaseService {
       case WebhookTypeEnum.TransactionPaid:
         return this.handleTransactionPaidWebhook(purchase);
       case WebhookTypeEnum.TransactionFailed:
-        return this.handleTransactionFailedWebhook(purchase, payment);
+        return this.handleTransactionFailedWebhook(purchase);
       default:
         return true;
     }

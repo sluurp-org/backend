@@ -204,18 +204,25 @@ export class EventService {
       try {
         const { id: contentGroupId, expireMinute, oneTime } = contentGroup;
 
+        const contentQuantity = quantity || 1;
         const contents = await this.contentService.findAvailableContent(
           contentGroupId,
-          oneTime ? quantity || 1 : 1,
+          contentQuantity,
           transaction,
         );
 
-        if (oneTime) {
+        if (contents.length !== contentQuantity)
+          return {
+            ...defaultInput,
+            rawMessage: '디지털 컨텐츠 재고가 부족합니다.',
+          };
+
+        if (oneTime)
           await this.contentService.markContentAsUsed(
+            contentGroupId,
             contents.map(({ id }) => id),
             transaction,
           );
-        }
 
         const expireAt = new Date();
         if (expireMinute) {

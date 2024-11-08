@@ -14,12 +14,17 @@ import { isNumber, isURL } from 'class-validator';
 import { UpdateContentBodyDto } from './dto/req/update-content-body.dto.ts';
 import { CreateContentFileBodyDto } from './dto/req/create-content-file-body.dto';
 import { AwsService } from 'src/aws/aws.service';
+import { KakaoService } from 'src/kakao/kakao.service';
+import { differenceInHours } from 'date-fns';
+import { WorkspaceService } from 'src/workspace/workspace.service';
 
 @Injectable()
 export class ContentService {
   constructor(
     private readonly prismaService: PrismaService,
     private readonly awsService: AwsService,
+    private readonly kakaoService: KakaoService,
+    private readonly workspaceService: WorkspaceService,
   ) {}
 
   public async findAllGroup(
@@ -304,13 +309,68 @@ export class ContentService {
     });
   }
 
+  private async contentStockCheck(
+    contentGroupId: number,
+    transaction: Prisma.TransactionClient,
+  ) {
+    const contentGroup = await this.prismaService.contentGroup.findUnique({
+      where: { id: contentGroupId },
+    });
+
+    if (!contentGroup) return;
+    if (!contentGroup.oneTime) return;
+    if (
+      contentGroup.lastRemindAt &&
+      differenceInHours(contentGroup.lastRemindAt, new Date()) < 1
+    )
+      return; // 1시간 이내에는 재고 확인 안함
+
+    const contentLength = await transaction.content.count({
+      where: {
+        contentGroupId,
+        deletedAt: null,
+        used: false,
+        status: ContentStatus.READY,
+      },
+    });
+    if (contentLength > 10) return;
+
+    const targetWorkspace = await this.workspaceService.getWorkspaceOwners(
+      contentGroup.workspaceId,
+    );
+    if (!targetWorkspace) return;
+
+    await this.kakaoService.sendKakaoMessage(
+      targetWorkspace.workspaceUser.map(({ user }) => ({
+        to: user.phone,
+        templateId: 'KA01TP241104231627254IwYzStAr0gs',
+        variables: {
+          '#{고객명}': user.name,
+          '#{워크스페이스명}': targetWorkspace.name,
+          '#{컨텐츠명}': contentGroup.name,
+          '#{재고}': '10',
+          '#{남은재고}': contentLength.toString(),
+        },
+      })),
+    );
+
+    await transaction.contentGroup.update({
+      where: { id: contentGroupId },
+      data: { lastRemindAt: new Date() },
+    });
+  }
+
   public async markContentAsUsed(
+    contentGroupId: number,
     contentIds: number[],
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
-    return transaction.content.updateMany({
+    const updatedContents = await transaction.content.updateMany({
       where: { id: { in: contentIds } },
       data: { used: true },
     });
+    await this.contentStockCheck(contentGroupId, transaction);
+
+    return updatedContents;
   }
 }

@@ -514,8 +514,6 @@ export class PurchaseService {
     );
 
     if (result.status === PurchaseStatus.FAILED) {
-      await this.purchaseFailedAlert(workspace.id);
-
       throw new InternalServerErrorException(
         `결제 요청에 실패했습니다. - ${result.purchaseId}, ${result.reason}`,
       );

@@ -330,6 +330,7 @@ model ContentGroup {
   oneTime       Boolean     @default(false)
   expireMinute  Int?
   downloadLimit Int?
+  lastRemindAt  DateTime? // 마지막 재고 부족 알림 시간
 
   workspace Workspace @relation(fields: [workspaceId], references: [id])
   createdAt DateTime  @default(now())

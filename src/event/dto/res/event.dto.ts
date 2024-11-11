@@ -3,6 +3,40 @@ import { OrderStatus } from '@prisma/client';
 import { Exclude, Expose, Type } from 'class-transformer';
 import { MessageDto } from 'src/message/dto/res/message.dto';
 
+export class EventProduct {
+  @Expose()
+  @ApiProperty({
+    description: '상품 ID',
+    example: 1,
+  })
+  id: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품명',
+    example: 1,
+    required: false,
+  })
+  name?: string;
+}
+
+export class EventProductVariant {
+  @Expose()
+  @ApiProperty({
+    description: '상품 옵션 ID',
+    example: 1,
+  })
+  id: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품 옵션명',
+    example: 1,
+    required: false,
+  })
+  name?: string;
+}
+
 export class EventDto {
   @Expose()
   @ApiProperty({
@@ -28,6 +62,22 @@ export class EventDto {
 
   @Expose()
   @ApiProperty({
+    description: '상품',
+    type: EventProduct,
+  })
+  @Type(() => EventProduct)
+  product: EventProduct;
+
+  @Expose()
+  @ApiProperty({
+    description: '상품 옵션',
+    type: EventProductVariant,
+  })
+  @Type(() => EventProductVariant)
+  productVariant: EventProductVariant;
+
+  @Expose()
+  @ApiProperty({
     description: '메시지 ID',
     example: 1,
   })
@@ -48,6 +98,13 @@ export class EventDto {
     enum: OrderStatus,
   })
   type: OrderStatus;
+
+  @Expose()
+  @ApiProperty({
+    description: '활성화 여부',
+    example: true,
+  })
+  enabled: boolean;
 
   @Exclude()
   workspaceId: number;

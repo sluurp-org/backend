@@ -1,6 +1,6 @@
 import { ApiProperty } from '@nestjs/swagger';
 import { Transform } from 'class-transformer';
-import { IsNumber, IsOptional } from 'class-validator';
+import { IsNumber, IsOptional, ValidateIf } from 'class-validator';
 import { PaginationQueryDto } from 'src/common/dto/req/pagination-query.dto';
 
 export class FindEventQueryDto extends PaginationQueryDto {
@@ -19,20 +19,26 @@ export class FindEventQueryDto extends PaginationQueryDto {
     example: 1,
     required: false,
   })
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => {
+    if (value === '') return null;
+    return parseInt(value);
+  })
+  @ValidateIf((o) => o.productId)
   @IsNumber()
-  @IsOptional()
-  productId?: number;
+  productId?: number | null;
 
   @ApiProperty({
     description: '상품 옵션 ID',
     example: 1,
     required: false,
   })
-  @Transform(({ value }) => parseInt(value))
+  @Transform(({ value }) => {
+    if (value === '') return null;
+    return parseInt(value);
+  })
+  @ValidateIf((o) => o.productVariantId)
   @IsNumber()
-  @IsOptional()
-  productVariantId?: number;
+  productVariantId?: number | null;
 
   @ApiProperty({
     description: '메시지 ID',

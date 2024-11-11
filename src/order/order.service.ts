@@ -393,6 +393,7 @@ export class OrderService {
       where: {
         workspaceId,
         type,
+        enabled: true,
         OR: [
           ...(productId ? [{ productId }] : []),
           ...(productVariantId ? [{ productVariantId }] : []),

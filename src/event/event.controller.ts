@@ -12,6 +12,7 @@ import { EventDto } from './dto/res/event.dto';
 import { CreateEventBodyDto } from './dto/req/create-event-body.dto';
 import { FindEventHistoryQueryDto } from './dto/req/find-event-history-query.dto';
 import { EventHistoryDto } from './dto/res/event-history.dto';
+import { UpdateEventBodyDto } from './dto/req/update-event-body.dto';
 
 @ApiTags('event')
 @WorkspaceController('event')
@@ -113,7 +114,7 @@ export class EventController {
   public async updateEvent(
     @ReqWorkspace() { id }: Workspace,
     @Param('eventId') eventId: number,
-    @Body() dto: CreateEventBodyDto,
+    @Body() dto: UpdateEventBodyDto,
   ) {
     return this.eventService.update(id, eventId, dto);
   }

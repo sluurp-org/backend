@@ -387,7 +387,8 @@ model Event {
   productVariantId Int?
   messageId        Int
 
-  type OrderStatus
+  type    OrderStatus
+  enabled Boolean     @default(true)
 
   product        Product?        @relation(fields: [productId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])

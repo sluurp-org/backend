@@ -28,7 +28,6 @@ export class EventService {
 
   public async findMany(workspaceId: number, dto: FindEventQueryDto) {
     const { take, skip, id, messageId, productId, productVariantId } = dto;
-    console.log(dto);
 
     return this.prismaService.event.findMany({
       where: {

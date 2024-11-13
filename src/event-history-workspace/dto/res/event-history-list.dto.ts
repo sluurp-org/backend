@@ -61,6 +61,34 @@ export class EventHistoryListDto {
   })
   createdAt: Date;
 
+  @Expose()
+  @ApiProperty({
+    description: '발송 예정 날짜',
+    example: '2024-01-01',
+  })
+  scheduledAt?: Date;
+
+  @Exclude()
+  receiverPhone?: string;
+
+  @Exclude()
+  receiverEmail?: string;
+
+  @Exclude()
+  workspaceId: number;
+
+  @Exclude()
+  messageId?: number;
+
+  @Exclude()
+  messageContent?: string;
+
+  @Exclude()
+  messageVariables: unknown;
+
+  @Exclude()
+  rawMessage?: string;
+
   @Exclude()
   eventId: number;
 
@@ -77,10 +105,7 @@ export class EventHistoryListDto {
   creditId: number;
 
   @Exclude()
-  solapiStatusCode: string;
-
-  @Exclude()
-  solapiMessageId: string;
+  externalMessageId: string;
 
   @Exclude()
   updatedAt: Date;

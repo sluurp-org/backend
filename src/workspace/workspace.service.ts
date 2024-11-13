@@ -119,25 +119,23 @@ export class WorkspaceService {
     if (!existWorkspace)
       throw new ForbiddenException('존재하지 않는 워크스페이스입니다.');
 
-    const workspaceUser = await this.validateWorkspaceUser(id, userId);
-    if (!workspaceUser)
-      throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
+    await this.validateWorkspaceUser(userId, id);
 
-    try {
-      await this.kakaoService.deleteKakaoChannel(id);
+    return await this.prismaService.$transaction(async (tx) => {
+      await tx.workspaceUser.deleteMany({ where: { workspaceId: id } });
 
-      const workspace = await this.prismaService.workspace.update({
+      await tx.store.updateMany({
+        data: { deletedAt: new Date() },
+        where: { workspaceId: id },
+      });
+
+      const workspace = await tx.workspace.update({
         where: { id },
         data: { deletedAt: new Date() },
       });
 
       return workspace;
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '워크스페이스 삭제에 실패했습니다.',
-      );
-    }
+    });
   }
 
   public async findWorkspacesByUserId(userId: number) {
@@ -177,8 +175,8 @@ export class WorkspaceService {
   ) {
     try {
       const workspaceUser = await this.validateWorkspaceUser(
-        workspaceId,
         userId,
+        workspaceId,
       );
       if (!workspaceUser)
         throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
@@ -238,20 +236,12 @@ export class WorkspaceService {
     userId: number,
     workspaceId: number,
   ): Promise<WorkspaceUser> {
-    try {
-      const user = await this.prismaService.workspaceUser.findUnique({
-        where: { userId_workspaceId: { userId, workspaceId } },
-      });
-      if (!user)
-        throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
+    const user = await this.prismaService.workspaceUser.findUnique({
+      where: { userId_workspaceId: { userId, workspaceId } },
+    });
+    if (!user) throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
-      return user;
-    } catch (error) {
-      this.logger.error(error);
-      throw new InternalServerErrorException(
-        '워크스페이스 사용자 조회에 실패했습니다.',
-      );
-    }
+    return user;
   }
 
   public async getWorkspaceOwners(workspaceId: number) {

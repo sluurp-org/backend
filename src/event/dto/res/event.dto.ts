@@ -106,6 +106,20 @@ export class EventDto {
   })
   enabled: boolean;
 
+  @Expose()
+  @ApiProperty({
+    description: '발송 지연일',
+    example: 1,
+  })
+  delayDays: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '발송 시간',
+    example: 1,
+  })
+  sendHour: number;
+
   @Exclude()
   workspaceId: number;
 

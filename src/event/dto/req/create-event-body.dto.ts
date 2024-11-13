@@ -35,6 +35,25 @@ export class CreateEventBodyDto {
   @IsNotEmpty()
   messageId: number;
 
+  // delay Days and send Hour is optional
+  @ApiProperty({
+    description: '지연 일',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  delayDays?: number;
+
+  @ApiProperty({
+    description: '발송 시간',
+    example: 1,
+    required: false,
+  })
+  @IsNumber()
+  @IsOptional()
+  sendHour?: number;
+
   @ApiProperty({
     description: '이벤트 타입',
     example: OrderStatus.PAY_WAITING,

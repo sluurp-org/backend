@@ -216,16 +216,19 @@ export class StoreService {
     });
     if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
 
+    const LAST_SYNC_MINUTES = 5;
+
     if (
       store.lastProductSyncAt &&
-      differenceInMinutes(new Date(), store.lastProductSyncAt) < 10
+      differenceInMinutes(new Date(), store.lastProductSyncAt) <
+        LAST_SYNC_MINUTES
     ) {
       const leftMinutes = differenceInMinutes(
         new Date(),
         store.lastProductSyncAt,
       );
       throw new BadRequestException(
-        `최근 동기화 시간이 ${leftMinutes}분 이내입니다. ${leftMinutes}분 뒤에 다시 시도해주세요.`,
+        `${LAST_SYNC_MINUTES - leftMinutes}분 뒤에 다시 시도해주세요.`,
       );
     }
 

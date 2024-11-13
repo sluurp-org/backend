@@ -21,7 +21,6 @@ export class ProductService {
         deletedAt: null,
         store: {
           id: storeId,
-          enabled: true,
           deletedAt: null,
         },
       },
@@ -43,7 +42,7 @@ export class ProductService {
         workspaceId,
         deletedAt: null,
         name: name && { contains: name },
-        store: { id: storeId, enabled: true, deletedAt: null },
+        store: { id: storeId, deletedAt: null },
       },
     });
   }

@@ -148,6 +148,20 @@ export class EventService {
     });
   }
 
+  private calculateScheduledAt(
+    sendHour: number | null,
+    delayDays: number | null,
+  ): Date {
+    const now = new Date();
+
+    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+
+    if (delayDays) kstNow.setDate(kstNow.getDate() + delayDays);
+    if (sendHour) kstNow.setHours(sendHour, 0, 0, 0);
+
+    return new Date(kstNow.getTime() - 9 * 60 * 60 * 1000);
+  }
+
   private async createEventHistoryInput(
     order: Order,
     event: Prisma.EventGetPayload<{
@@ -165,6 +179,7 @@ export class EventService {
       | 'rawMessage'
       | 'receiverPhone'
       | 'receiverEmail'
+      | 'scheduledAt'
     >
   > {
     const {
@@ -175,6 +190,8 @@ export class EventService {
     } = order;
     const {
       id: eventId,
+      delayDays,
+      sendHour,
       message: { id: messageId, contentGroup, target, customPhone },
     } = event;
 
@@ -191,13 +208,17 @@ export class EventService {
 
     const defaultInput: Pick<
       Prisma.EventHistoryCreateInput,
-      'message' | 'event' | 'order' | 'status' | 'receiverPhone'
+      'message' | 'event' | 'order' | 'status' | 'receiverPhone' | 'scheduledAt'
     > = {
       message: { connect: { id: messageId } },
       event: { connect: { id: eventId } },
       order: { connect: { id: orderId } },
       status: EventStatus.FAILED,
       receiverPhone,
+      scheduledAt:
+        sendHour || delayDays
+          ? this.calculateScheduledAt(sendHour, delayDays)
+          : new Date(),
     };
 
     if (contentGroup) {

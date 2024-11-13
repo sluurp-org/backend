@@ -390,6 +390,9 @@ model Event {
   type    OrderStatus
   enabled Boolean     @default(true)
 
+  delayDays Int?
+  sendHour  Int? // 0 ~ 23 korea standard time
+
   product        Product?        @relation(fields: [productId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
   workspace      Workspace       @relation(fields: [workspaceId], references: [id])
@@ -437,6 +440,8 @@ model EventHistory {
   status     EventStatus
   rawMessage String?
 
+  // 예정 발송 시간
+  scheduledAt       DateTime?
   processedAt       DateTime?
   externalMessageId String?
 

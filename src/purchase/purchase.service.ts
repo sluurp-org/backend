@@ -7,7 +7,14 @@ import {
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
 import { PortoneService } from 'src/portone/portone.service';
-import { Config, EventStatus, Prisma, PurchaseStatus } from '@prisma/client';
+import {
+  Benefit,
+  BenefitType,
+  Config,
+  EventStatus,
+  Prisma,
+  PurchaseStatus,
+} from '@prisma/client';
 import { CreateBillingBodyDto } from './dto/req/create-billing-body.dto';
 import { PurchaseHistoryQueryDto } from './dto/req/purchase-history-query.dto';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
@@ -40,6 +47,7 @@ export class PurchaseService {
   public async getPurchase(workspaceId: number) {
     const workspace = await this.prismaService.workspace.findUnique({
       where: { id: workspaceId },
+      include: { workspaceBenefit: { include: { benefit: true } } },
     });
     if (!workspace)
       throw new NotFoundException('워크스페이스를 찾을 수 없습니다.');
@@ -55,6 +63,7 @@ export class PurchaseService {
       config,
       lastPurchaseAt,
       nextPurchaseAt,
+      workspace.workspaceBenefit.map((benefit) => benefit.benefit),
     );
 
     return {
@@ -276,11 +285,48 @@ export class PurchaseService {
     return false;
   }
 
+  private applyEffectiveBenefits(benefits: Benefit[]) {
+    return benefits.reduce<Record<BenefitType, Benefit | null>>(
+      (acc, benefit) => {
+        if (!benefit.enabled) return acc;
+
+        const existingBenefit = acc[benefit.type];
+        if (!existingBenefit) {
+          acc[benefit.type] = benefit;
+        } else {
+          switch (benefit.type) {
+            case BenefitType.DISCOUNT_PERCENT:
+            case BenefitType.DISCOUNT_AMOUNT:
+              if (benefit.value > existingBenefit.value) {
+                acc[benefit.type] = benefit;
+              }
+              break;
+            case BenefitType.DEFAULT_PRICE:
+              if (benefit.value < existingBenefit.value) {
+                acc[benefit.type] = benefit;
+              }
+              break;
+            default:
+              break;
+          }
+        }
+
+        return acc;
+      },
+      {
+        [BenefitType.DISCOUNT_PERCENT]: null,
+        [BenefitType.DISCOUNT_AMOUNT]: null,
+        [BenefitType.DEFAULT_PRICE]: null,
+      },
+    );
+  }
+
   public async calculatePurchasePrice(
     workspaceId: number,
     config: Config,
     lastPurchaseAt: Date,
     nextPurchaseAt: Date,
+    benefits: Benefit[],
     transaction: Prisma.TransactionClient = this.prismaService,
   ) {
     const { defaultPrice, alimtalkSendPrice, contentSendPrice } = config;
@@ -295,28 +341,27 @@ export class PurchaseService {
       include: { contents: true },
     });
 
-    const purchasePrice = eventHistories
-      .reduce<{ contentSend: boolean; contentCount: number; price: number }[]>(
-        (acc, cur) => {
-          let price = alimtalkSendPrice;
-          if (cur.contents.length > 0)
-            price += contentSendPrice * cur.contents.length;
+    let contentSendCount = 0;
+    let alimtalkSendCount = 100;
 
-          acc.push({
-            contentSend: cur.contents.length > 0,
-            contentCount: cur.contents.length,
-            price,
-          });
+    for (const event of eventHistories) {
+      const contentCount = event.contents.length;
 
-          return acc;
-        },
-        [],
-      )
-      .sort((a, b) => a.price - b.price);
+      contentSendCount += contentCount;
+      alimtalkSendCount++;
+    }
 
-    const amount = purchasePrice.reduce((acc, cur) => acc + cur.price, 0);
-    if (amount === 0)
+    const {
+      [BenefitType.DEFAULT_PRICE]: defaultBenefit,
+      [BenefitType.DISCOUNT_AMOUNT]: discountBenefit,
+    } = this.applyEffectiveBenefits(benefits);
+
+    if (
+      (contentSendCount === 0 && alimtalkSendCount === 0) ||
+      freeTrialAvailable
+    ) {
       return {
+        ...config,
         freeTrialAvailable,
         noPurchase: true,
         contentSendCount: 0,
@@ -324,32 +369,51 @@ export class PurchaseService {
         amount: 0,
         discountAmount: 0,
         totalAmount: 0,
-        ...config,
+        defaultPrice: defaultBenefit?.value || defaultPrice,
       };
+    }
 
-    const defaultAmount = defaultPrice + amount;
+    const defaultAmount = defaultBenefit?.value || defaultPrice;
 
-    const discountAmount = freeTrialAvailable
-      ? defaultAmount
-      : purchasePrice.slice(0, 100).reduce((acc, cur) => acc + cur.price, 0);
+    const alimtalkTotalPrice = alimtalkSendCount * alimtalkSendPrice;
+    const contentTotalPrice = contentSendCount * contentSendPrice;
+    const amount = alimtalkTotalPrice + contentTotalPrice + defaultAmount;
 
-    const totalAmount = freeTrialAvailable ? 0 : defaultAmount - discountAmount;
+    const discountAlimtalkPrice =
+      alimtalkSendCount <= 100
+        ? alimtalkSendCount * alimtalkSendPrice
+        : 100 * alimtalkSendPrice;
 
-    const contentSendCount = purchasePrice.reduce(
-      (acc, cur) => (cur.contentSend ? acc + cur.contentCount || 0 : acc),
-      0,
+    const discountAmount = Math.min(
+      amount,
+      (discountBenefit?.value || 0) + discountAlimtalkPrice,
     );
-    const alimtalkSendCount = purchasePrice.length;
+    const totalAmount = Math.max(0, amount - discountAmount);
+
+    if (totalAmount === 0) {
+      return {
+        ...config,
+        freeTrialAvailable,
+        noPurchase: true,
+        contentSendCount,
+        alimtalkSendCount,
+        amount,
+        discountAmount,
+        totalAmount,
+        defaultPrice: defaultBenefit?.value || defaultPrice,
+      };
+    }
 
     return {
+      ...config,
       freeTrialAvailable,
       noPurchase: false,
       contentSendCount,
       alimtalkSendCount,
-      amount: defaultAmount,
+      amount,
       discountAmount,
       totalAmount,
-      ...config,
+      defaultPrice: defaultAmount,
     };
   }
 
@@ -375,7 +439,10 @@ export class PurchaseService {
 
   private async createPurchaseByWorkspace(
     workspace: Prisma.WorkspaceGetPayload<{
-      include: { billing: true };
+      include: {
+        billing: true;
+        workspaceBenefit: { include: { benefit: true } };
+      };
     }>,
     config: Config,
   ): Promise<{
@@ -412,6 +479,7 @@ export class PurchaseService {
           config,
           purchasePeriodStart,
           purchasePeriodEnd,
+          workspace.workspaceBenefit.map((benefit) => benefit.benefit),
           transaction,
         );
 
@@ -537,7 +605,12 @@ export class PurchaseService {
 
     const workspaces = await this.prismaService.workspace.findMany({
       where: { deletedAt: null, nextPurchaseAt: { lte: new Date() } },
-      include: { billing: true },
+      include: {
+        billing: true,
+        workspaceBenefit: {
+          include: { benefit: true },
+        },
+      },
     });
 
     await Promise.allSettled(

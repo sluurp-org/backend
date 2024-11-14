@@ -55,6 +55,44 @@ enum Provider {
   NAVER
 }
 
+model Benefit {
+  id Int @id @default(autoincrement())
+
+  name        String
+  description String
+  type        BenefitType
+  value       Int
+
+  enabled Boolean @default(true)
+
+  createdAt        DateTime           @default(now())
+  updatedAt        DateTime           @default(now()) @updatedAt
+  workspaceBenefit WorkspaceBenefit[]
+}
+
+enum BenefitType {
+  DISCOUNT_PERCENT
+  DISCOUNT_AMOUNT
+  DEFAULT_PRICE
+}
+
+model WorkspaceBenefit {
+  id Int @id @default(autoincrement())
+
+  workspaceId Int
+  benefitId   Int
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id])
+  benefit   Benefit   @relation(fields: [benefitId], references: [id])
+
+  endedAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([workspaceId, benefitId])
+}
+
 model WorkspaceUser {
   id          Int           @id @default(autoincrement())
   userId      Int
@@ -101,6 +139,7 @@ model Workspace {
   eventHistory               EventHistory[]
   dailyWorkspaceStatistics   DailyWorkspaceStatistics[]
   monthlyWorkspaceStatistics MonthlyWorkspaceStatistics[]
+  workspaceBenefit           WorkspaceBenefit[]
 }
 
 model Billing {

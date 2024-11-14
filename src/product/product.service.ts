@@ -53,10 +53,7 @@ export class ProductService {
         id: productId,
         workspaceId,
         deletedAt: null,
-        store: {
-          enabled: true,
-          deletedAt: null,
-        },
+        store: { deletedAt: null },
       },
       include: {
         store: true,

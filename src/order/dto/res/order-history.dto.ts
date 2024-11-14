@@ -61,6 +61,13 @@ export class EventHistoryDto {
   @Type(() => EventHistoryMessageDto)
   messageTemplate: EventHistoryMessageDto;
 
+  @Expose()
+  @ApiProperty({
+    description: '발송 예정 날짜',
+    example: '2024-01-01',
+  })
+  scheduledAt?: Date;
+
   @Exclude()
   solapiStatusCode: string;
 

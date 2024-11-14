@@ -13,6 +13,10 @@ import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
 import { SmartstoreService } from 'src/smartstore/smartstore.service';
 import { SqsService } from '@ssut/nestjs-sqs';
 import { differenceInMinutes } from 'date-fns';
+import { OnEvent } from '@nestjs/event-emitter';
+import { WorkspaceService } from 'src/workspace/workspace.service';
+import { KakaoService } from 'src/kakao/kakao.service';
+import { EventEmitter2 } from '@nestjs/event-emitter';
 
 @Injectable()
 export class StoreService {
@@ -21,6 +25,9 @@ export class StoreService {
     private readonly sqsService: SqsService,
     private readonly prismaService: PrismaService,
     private readonly smartstoreService: SmartstoreService,
+    private readonly workspaceService: WorkspaceService,
+    private readonly kakaoService: KakaoService,
+    private eventEmitter: EventEmitter2,
   ) {}
 
   public async findMany(workspaceId: number, findStoreDto: FindStoreQueryDto) {
@@ -209,13 +216,12 @@ export class StoreService {
     });
   }
 
-  public async syncProduct(workspaceId: number, storeId: number) {
+  public async requestSyncProduct(workspaceId: number, storeId: number) {
     const store = await this.prismaService.store.findUnique({
       where: { id: storeId, workspaceId, deletedAt: null },
       include: { smartStoreCredentials: true },
     });
     if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
-
     const LAST_SYNC_MINUTES = 5;
 
     if (
@@ -232,6 +238,33 @@ export class StoreService {
       );
     }
 
+    const emit = this.eventEmitter.emit('sync.product', {
+      workspaceId,
+      storeId,
+    });
+
+    if (!emit)
+      throw new InternalServerErrorException(
+        '동기화 요청을 처리하는데 실패하였습니다.',
+      );
+
+    await this.prismaService.store.update({
+      where: { id: storeId },
+      data: { lastProductSyncAt: new Date() },
+    });
+  }
+
+  @OnEvent('sync.product')
+  public async syncProduct(payload: { workspaceId: number; storeId: number }) {
+    const { workspaceId, storeId } = payload;
+    const store = await this.prismaService.store.findUnique({
+      where: { id: storeId, workspaceId, deletedAt: null },
+      include: { smartStoreCredentials: true },
+    });
+    if (!store) throw new NotFoundException('스토어 정보를 찾을 수 없습니다.');
+
+    this.logger.log(`Syncing product for store ${store.name}(${storeId})`);
+
     if (store.type === StoreType.SMARTSTORE && store.smartStoreCredentials) {
       const { applicationId, applicationSecret } = store.smartStoreCredentials;
 
@@ -241,49 +274,97 @@ export class StoreService {
           applicationSecret,
         );
 
-        return await this.prismaService.$transaction(async (tx) => {
-          await Promise.all(
-            syncResponse.map((product) => {
-              const { originProductNo, channelProducts } = product;
-              const productInfo = channelProducts.find(
-                (channelProduct) =>
-                  channelProduct.originProductNo === originProductNo,
-              );
-              if (!productInfo) return;
+        await this.prismaService.$transaction(
+          async (tx) => {
+            await Promise.all(
+              syncResponse.map((product) => {
+                const { originProductNo, channelProducts } = product;
+                const productInfo = channelProducts.find(
+                  (channelProduct) =>
+                    channelProduct.originProductNo === originProductNo,
+                );
+                if (!productInfo) return;
 
-              const {
-                name,
-                representativeImage: { url },
-              } = productInfo;
-              return tx.product.upsert({
-                where: {
-                  productId_storeId: {
-                    productId: originProductNo.toString(),
-                    storeId: storeId,
+                const {
+                  name,
+                  representativeImage: { url },
+                } = productInfo;
+
+                return tx.product.upsert({
+                  where: {
+                    productId_storeId: {
+                      productId: originProductNo.toString(),
+                      storeId: storeId,
+                    },
                   },
-                },
-                create: {
-                  workspace: { connect: { id: workspaceId } },
-                  productId: originProductNo.toString(),
-                  store: { connect: { id: storeId } },
-                  name,
-                  productImageUrl: url,
-                },
-                update: {
-                  name,
-                  productImageUrl: url,
-                },
-              });
-            }),
-          );
+                  create: {
+                    workspace: { connect: { id: workspaceId } },
+                    productId: originProductNo.toString(),
+                    store: { connect: { id: storeId } },
+                    name,
+                    productImageUrl: url,
+                  },
+                  update: {
+                    name,
+                    productImageUrl: url,
+                  },
+                });
+              }),
+            );
 
-          return await tx.store.update({
-            where: { id: storeId },
-            data: { lastProductSyncAt: new Date() },
-          });
-        });
+            return await tx.store.update({
+              where: { id: storeId },
+              data: { lastProductSyncAt: new Date() },
+            });
+          },
+          {
+            maxWait: 1000 * 60 * 5, // 5 minutes
+            timeout: 1000 * 60 * 5, // 5 minutes
+          },
+        );
+
+        const targetWorkspace =
+          await this.workspaceService.getWorkspaceOwners(workspaceId);
+        if (!targetWorkspace) return;
+
+        await this.kakaoService.sendKakaoMessage(
+          targetWorkspace.workspaceUser.map(({ user }) => ({
+            to: user.phone,
+            templateId: 'KA01TP241114020554861jj4CrtMO5V4',
+            variables: {
+              '#{고객명}': user.name,
+              '#{워크스페이스아이디}': workspaceId.toString(),
+              '#{워크스페이스명}': targetWorkspace.name,
+              '#{스토어명}': store.name,
+              '#{상품수}': syncResponse.length.toString(),
+            },
+          })),
+        );
+
+        this.logger.log(
+          `Synced product for store ${store.name}(${storeId}), ${syncResponse.length} products`,
+        );
+        return;
       } catch (error) {
         if (error.status) throw error;
+
+        const targetWorkspace =
+          await this.workspaceService.getWorkspaceOwners(workspaceId);
+        if (!targetWorkspace) return;
+
+        await this.kakaoService.sendKakaoMessage(
+          targetWorkspace.workspaceUser.map(({ user }) => ({
+            to: user.phone,
+            templateId: 'KA01TP24111402232076653Deeg7n5Ss',
+            variables: {
+              '#{고객명}': user.name,
+              '#{워크스페이스아이디}': workspaceId.toString(),
+              '#{워크스페이스명}': targetWorkspace.name,
+              '#{스토어명}': store.name,
+              '#{스토어아이디}': storeId.toString(),
+            },
+          })),
+        );
 
         throw new InternalServerErrorException(
           '스토어 정보를 동기화하는데 실패하였습니다.',

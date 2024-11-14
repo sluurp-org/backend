@@ -133,6 +133,6 @@ export class StoreController {
     @ReqWorkspace() { id }: Workspace,
     @Param('storeId') storeId: number,
   ) {
-    return this.storeService.syncProduct(id, storeId);
+    return this.storeService.requestSyncProduct(id, storeId);
   }
 }

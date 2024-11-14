@@ -35,6 +35,7 @@ import { EventHistoryModule } from './event-history/event-history.module';
 import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { AnalyticsModule } from './analytics/analytics.module';
+import { EventEmitterModule } from '@nestjs/event-emitter';
 
 @Module({
   imports: [
@@ -84,6 +85,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     EventHistoryWorkspaceModule,
     TelegramModule,
     AnalyticsModule,
+    EventEmitterModule.forRoot(),
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

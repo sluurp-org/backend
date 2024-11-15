@@ -22,6 +22,16 @@ export class FindOrderQueryDto extends PaginationQueryDto {
   id?: number;
 
   @ApiProperty({
+    description: '상품 ID',
+    example: 2,
+    required: false,
+  })
+  @Transform(({ value }) => parseInt(value))
+  @IsNumber()
+  @IsOptional()
+  productId?: number;
+
+  @ApiProperty({
     description: '스토어 ID',
     example: 2,
     required: false,

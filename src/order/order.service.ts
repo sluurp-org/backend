@@ -64,6 +64,7 @@ export class OrderService {
       take,
       skip,
       id,
+      productId,
       orderId,
       productOrderId,
       status,
@@ -84,8 +85,9 @@ export class OrderService {
       where: {
         workspaceId,
         id,
-        orderId,
-        productOrderId,
+        orderId: { contains: orderId },
+        productOrderId: { contains: productOrderId },
+        productId,
         status,
         storeId,
         ...(startDate && endDate
@@ -117,6 +119,7 @@ export class OrderService {
       productOrderId,
       status,
       storeId,
+      productId,
       startDate,
       endDate,
     }: FindOrderQueryDto,
@@ -125,8 +128,9 @@ export class OrderService {
       where: {
         workspaceId,
         id,
-        orderId,
-        productOrderId,
+        orderId: { contains: orderId },
+        productOrderId: { contains: productOrderId },
+        productId,
         status,
         storeId,
         ...(startDate && endDate

@@ -203,6 +203,7 @@ export class StoreService {
         where: { id: storeId },
         data: {
           deletedAt: new Date(),
+          enabled: false,
         },
         include: { smartStoreCredentials: true },
       });

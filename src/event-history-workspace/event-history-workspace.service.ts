@@ -12,7 +12,7 @@ export class EventHistoryWorkspaceService {
     const eventHistory = await this.prisma.eventHistory.findUnique({
       where: {
         id: eventHistoryId,
-        order: { workspaceId },
+        workspaceId,
       },
       include: {
         contents: {
@@ -40,11 +40,15 @@ export class EventHistoryWorkspaceService {
     workspaceId: number,
     query: EventHistoryWorkspaceQueryDto,
   ): Promise<EventHistory[]> {
-    const { orderId, take, skip } = query;
+    const { id, orderId, productId, messageId, status, take, skip } = query;
 
     const eventHistories = await this.prisma.eventHistory.findMany({
       where: {
-        order: { workspaceId, id: orderId },
+        id: { contains: id },
+        order: { id: orderId, productId },
+        workspaceId,
+        messageId,
+        status,
       },
       take,
       skip,
@@ -57,11 +61,15 @@ export class EventHistoryWorkspaceService {
     workspaceId: number,
     query: EventHistoryWorkspaceQueryDto,
   ) {
-    const { orderId } = query;
+    const { id, orderId, productId, messageId, status } = query;
 
     const count = await this.prisma.eventHistory.count({
       where: {
-        order: { workspaceId, id: orderId },
+        id: { contains: id },
+        order: { id: orderId, productId },
+        workspaceId,
+        messageId,
+        status,
       },
     });
     return count;

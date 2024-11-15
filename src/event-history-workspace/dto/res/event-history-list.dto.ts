@@ -12,28 +12,6 @@ export class EventHistoryListDto {
 
   @Expose()
   @ApiProperty({
-    description: '상품 다운로드 만료 날짜',
-    example: '2024-01-01',
-    nullable: true,
-  })
-  expiredAt?: Date;
-
-  @Expose()
-  @ApiProperty({
-    description: '상품 다운로드 횟수',
-    example: 1,
-  })
-  downloadCount: number;
-
-  @Expose()
-  @ApiProperty({
-    description: '상품 다운로드 제한 여부',
-    example: false,
-  })
-  disableDownload: boolean;
-
-  @Expose()
-  @ApiProperty({
     description: '상품 다운로드 상태',
     example: EventStatus.FAILED,
     enum: EventStatus,
@@ -45,7 +23,21 @@ export class EventHistoryListDto {
     description: '이벤트 메시지',
     example: '이벤트 발송 대기',
   })
-  message: string;
+  rawMessage: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '이벤트 메시지',
+    example: '상품은 잘 받으셨나요...',
+  })
+  messageContent: string;
+
+  @Expose()
+  @ApiProperty({
+    description: '이벤트 메시지 변수',
+    example: { name: '홍길동' },
+  })
+  messageVariables: Record<string, string>;
 
   @Expose()
   @ApiProperty({
@@ -68,32 +60,15 @@ export class EventHistoryListDto {
   })
   scheduledAt?: Date;
 
-  @Exclude()
-  receiverPhone?: string;
-
-  @Exclude()
-  receiverEmail?: string;
-
-  @Exclude()
-  workspaceId: number;
-
-  @Exclude()
-  messageId?: number;
-
-  @Exclude()
-  messageContent?: string;
-
-  @Exclude()
-  messageVariables: unknown;
-
-  @Exclude()
-  rawMessage?: string;
+  @Expose()
+  @ApiProperty({
+    description: '주문 ID',
+    example: 1,
+  })
+  orderId: number;
 
   @Exclude()
   eventId: number;
-
-  @Exclude()
-  orderId: number;
 
   @Exclude()
   orderHistoryId: number;
@@ -105,7 +80,10 @@ export class EventHistoryListDto {
   creditId: number;
 
   @Exclude()
-  externalMessageId: string;
+  solapiStatusCode: string;
+
+  @Exclude()
+  solapiMessageId: string;
 
   @Exclude()
   updatedAt: Date;

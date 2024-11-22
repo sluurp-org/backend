@@ -178,10 +178,38 @@ export class ContentService {
     this.validateContentGroupType(group.type, text);
 
     return await this.prismaService.$transaction(async (tx) => {
-      if (group.oneTime) {
+      if (!group.oneTime) {
+        const targetText = text[0];
+        const contentCount = await tx.content.count({
+          where: {
+            workspaceId: id,
+            contentGroupId,
+            used: false,
+            deletedAt: null,
+          },
+        });
+
+        if (contentCount === 0) {
+          return await tx.content.create({
+            data: {
+              workspaceId: id,
+              contentGroupId,
+              text: targetText,
+              type: group.type,
+              status: ContentStatus.READY,
+            },
+          });
+        }
+
         return await tx.content.updateMany({
           where: { workspaceId: id, contentGroupId, used: false },
-          data: { deletedAt: new Date() },
+          data: {
+            workspaceId: id,
+            contentGroupId,
+            text: targetText,
+            type: group.type,
+            status: ContentStatus.READY,
+          },
         });
       }
 

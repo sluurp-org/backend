@@ -213,7 +213,7 @@ export class ContentService {
         });
       }
 
-      return tx.content.createMany({
+      return await tx.content.createMany({
         data: text.map((t) => ({
           workspaceId: id,
           contentGroupId,

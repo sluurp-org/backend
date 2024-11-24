@@ -15,6 +15,7 @@ import { ProductDetails } from './interfaces/product.interface';
 import { isAxiosError } from 'axios';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { WorkspaceService } from 'src/workspace/workspace.service';
+import { differenceInMinutes } from 'date-fns';
 
 @Injectable()
 export class SmartstoreService {
@@ -222,11 +223,9 @@ export class SmartstoreService {
       if (
         cachedToken?.expiresAt &&
         cachedToken.accessToken &&
-        cachedToken.expiresAt > new Date()
-      ) {
-        const isValid = await this.validateToken(cachedToken.accessToken);
-        if (isValid) return cachedToken.accessToken;
-      }
+        differenceInMinutes(cachedToken.expiresAt, new Date()) > 10
+      )
+        return cachedToken.accessToken;
 
       const timestamp = new Date().getTime();
       const hashToken = this.hashToken(

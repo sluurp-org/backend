@@ -6,7 +6,7 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Provider, User, VerificationType } from '@prisma/client';
+import { Prisma, Provider, User, VerificationType } from '@prisma/client';
 import * as crypto from 'crypto';
 import { CreateUserBodyDto } from './dto/req/create-user-body.dto';
 import { UpdateUserBodyDto } from './dto/req/update-user-body.dto';
@@ -239,35 +239,41 @@ export class UsersService {
     }
   }
 
-  // public async createUserByProvider(
-  //   createUserBodyDto: CreateUserBodyDto,
-  //   provider: Provider,
-  //   providerId: string,
-  // ): Promise<User> {
-  //   const userExistsByProvider = await this.findOneByProvider(
-  //     provider,
-  //     providerId,
-  //   );
-  //   if (userExistsByProvider)
-  //     throw new NotAcceptableException('이미 가입된 계정입니다.');
+  public async createUserByProvider(
+    createUserBodyDto: Prisma.UserCreateInput,
+    provider: Provider,
+    providerId: string,
+  ): Promise<User> {
+    const userExistsByProvider = await this.findOneByProvider(
+      provider,
+      providerId,
+    );
+    if (userExistsByProvider)
+      throw new NotAcceptableException('이미 가입된 계정입니다.');
 
-  //   try {
-  //     return await this.prismaService.user.create({
-  //       data: {
-  //         ...createUserBodyDto,
-  //         password: '',
-  //         salt: '',
-  //         provider,
-  //         providerId,
-  //       },
-  //     });
-  //   } catch (error) {
-  //     this.logger.error(error.message);
-  //     throw new InternalServerErrorException(
-  //       '사용자 정보를 저장하는 중 오류가 발생했습니다.',
-  //     );
-  //   }
-  // }
+    const userExistsByPhone = await this.prismaService.user.findUnique({
+      where: { phone: createUserBodyDto.phone },
+    });
+    if (userExistsByPhone)
+      throw new NotAcceptableException('이미 가입된 전화번호입니다.');
+
+    try {
+      return await this.prismaService.user.create({
+        data: {
+          ...createUserBodyDto,
+          password: '',
+          salt: '',
+          provider,
+          providerId,
+        },
+      });
+    } catch (error) {
+      this.logger.error(error.message);
+      throw new InternalServerErrorException(
+        '사용자 정보를 저장하는 중 오류가 발생했습니다.',
+      );
+    }
+  }
 
   public async updateUserById(
     userId: number,

@@ -4,7 +4,7 @@ import { UsersService } from 'src/users/users.service';
 import { JwtService } from '@nestjs/jwt';
 import { ConfigService } from '@nestjs/config';
 import { TokenDto } from './dto/res/token.dto';
-import { User } from '@prisma/client';
+import { Provider, User } from '@prisma/client';
 import { NaverService } from 'src/naver/naver.service';
 
 @Injectable()
@@ -61,35 +61,37 @@ export class AuthService {
     return user.refreshToken === refreshToken;
   }
 
-  // public async naverLogin(code: string) {
-  //   const profile = await this.naverService.getProfile(code);
-  //   const user = await this.userService.findOneByProvider(
-  //     Provider.NAVER,
-  //     profile.id,
-  //   );
+  public async naverLogin(code: string) {
+    const profile = await this.naverService.getProfile(code);
+    const user = await this.userService.findOneByProvider(
+      Provider.NAVER,
+      profile.id,
+    );
 
-  //   if (!user) {
-  //     const newUser = await this.userService.createUserByProvider(
-  //       {
-  //         email: profile.email,
-  //         name: profile.name,
-  //         password: '',
-  //       },
-  //       Provider.NAVER,
-  //       profile.id,
-  //     );
+    if (!user) {
+      const newUser = await this.userService.createUserByProvider(
+        {
+          name: profile.name,
+          phone: profile.mobile,
+          password: profile.id,
+          loginId: profile.id,
+          salt: profile.id,
+        },
+        Provider.NAVER,
+        profile.id,
+      );
 
-  //     const accessToken = this.generateAccessToken(newUser.id);
-  //     const refreshToken = await this.generateRefreshToken(newUser.id);
+      const accessToken = this.generateAccessToken(newUser.id);
+      const refreshToken = await this.generateRefreshToken(newUser.id);
 
-  //     return { accessToken, refreshToken };
-  //   }
+      return { accessToken, refreshToken };
+    }
 
-  //   const accessToken = this.generateAccessToken(user.id);
-  //   const refreshToken = await this.generateRefreshToken(user.id);
+    const accessToken = this.generateAccessToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id);
 
-  //   return { accessToken, refreshToken };
-  // }
+    return { accessToken, refreshToken };
+  }
 
   private generateAccessToken(userId: number): string {
     const secret = this.configService.get<string>(

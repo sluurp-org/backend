@@ -3,9 +3,8 @@ import {
   Controller,
   Get,
   Post,
-  // Query,
+  Query,
   Redirect,
-  Res,
   UseGuards,
 } from '@nestjs/common';
 import { ApiBody, ApiOperation, ApiResponse, ApiTags } from '@nestjs/swagger';
@@ -18,10 +17,10 @@ import { ReqUser } from 'src/common/decorators/req-user.decorator';
 import { User } from '@prisma/client';
 import { AuthGuard } from '@nestjs/passport';
 import { RefreshDto } from './dto/req/refresh.dto';
-import { Response } from 'express';
 import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { TokenDto } from './dto/res/token.dto';
 import { NaverService } from 'src/naver/naver.service';
+import { ConfigService } from '@nestjs/config';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -29,6 +28,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly naverService: NaverService,
+    private readonly configService: ConfigService,
   ) {}
 
   @Post('login')
@@ -38,27 +38,8 @@ export class AuthController {
     status: 200,
     type: TokenDto,
   })
-  async login(
-    @Body() loginDto: LoginDto,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const token = await this.authService.login(loginDto);
-
-    res.cookie('accessToken', token.accessToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
-
-    res.cookie('refreshToken', token.refreshToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
-
-    return token;
+  async login(@Body() loginDto: LoginDto) {
+    return this.authService.login(loginDto);
   }
 
   @Auth()
@@ -77,26 +58,8 @@ export class AuthController {
     status: 200,
     type: TokenDto,
   })
-  async refresh(
-    @ReqUser() user: User,
-    @Res({ passthrough: true }) res: Response,
-  ) {
-    const token = await this.authService.refresh(user.id);
-    res.cookie('accessToken', token.accessToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
-
-    res.cookie('refreshToken', token.refreshToken, {
-      domain: 'localhost',
-      httpOnly: false,
-      secure: true,
-      sameSite: 'none',
-    });
-
-    return token;
+  async refresh(@ReqUser() user: User) {
+    return this.authService.refresh(user.id);
   }
 
   @Get('naver')
@@ -108,38 +71,16 @@ export class AuthController {
     };
   }
 
-  // @Get('naver/callback')
-  // @ApiOperation({
-  //   summary: '네이버 로그인 콜백',
-  // })
-  // @Serialize(TokenDto)
-  // @ApiResponse({
-  //   status: 200,
-  //   type: TokenDto,
-  // })
-  // async naverCallback(
-  //   @Query('code') code: string,
-  //   @Res({
-  //     passthrough: true,
-  //   })
-  //   res: Response,
-  // ) {
-  //   const token = await this.authService.naverLogin(code);
-
-  //   res.cookie('accessToken', token.accessToken, {
-  //     domain: 'localhost',
-  //     httpOnly: false,
-  //     secure: true,
-  //     sameSite: 'none',
-  //   });
-
-  //   res.cookie('refreshToken', token.refreshToken, {
-  //     domain: 'localhost',
-  //     httpOnly: false,
-  //     secure: true,
-  //     sameSite: 'none',
-  //   });
-
-  //   return token;
-  // }
+  @Get('naver/callback')
+  @ApiOperation({
+    summary: '네이버 로그인 콜백',
+  })
+  @Serialize(TokenDto)
+  @ApiResponse({
+    status: 200,
+    type: TokenDto,
+  })
+  async naverCallback(@Query('code') code: string) {
+    return this.authService.naverLogin(code);
+  }
 }

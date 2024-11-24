@@ -57,8 +57,8 @@ export class NaverService {
         }),
       );
 
-      const { id, name, email } = profile.data.response;
-      return { id, name, email };
+      const { id, name, mobile } = profile.data.response;
+      return { id, name, mobile: mobile.replaceAll('-', '') };
     } catch (error) {
       throw new InternalServerErrorException('네이버 로그인에 실패했습니다.');
     }

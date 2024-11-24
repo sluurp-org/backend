@@ -26,6 +26,8 @@ export class WorkspaceGuard implements CanActivate {
     if (!workspace)
       throw new NotFoundException('워크스페이스가 존재하지 않습니다.');
 
+    if (user.isAdmin) return true;
+
     const workspaceUser = await this.workspaceService.validateWorkspaceUser(
       user.id,
       workspace.id,

@@ -45,6 +45,8 @@ model User {
   provider   Provider @default(LOCAL)
   providerId String?
 
+  isAdmin Boolean @default(false)
+
   workspaceUser WorkspaceUser[]
 
   @@unique([provider, providerId])

@@ -28,7 +28,7 @@ export class WorkspaceController {
     description: '내 워크스페이스를 조회합니다.',
   })
   async getWorkspaces(@ReqUser() user: User) {
-    return this.workspaceService.findWorkspacesByUserId(user.id);
+    return this.workspaceService.findWorkspacesByUserId(user);
   }
 
   @Get(':workspaceId')
@@ -38,7 +38,7 @@ export class WorkspaceController {
     description: '워크스페이스를 조회합니다.',
   })
   async getWorkspace(@ReqUser() user: User, @Param('workspaceId') id: number) {
-    return this.workspaceService.findWorkspaceById(user.id, id);
+    return this.workspaceService.findWorkspaceById(user, id);
   }
 
   @Post()

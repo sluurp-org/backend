@@ -4,21 +4,17 @@ import {
   Injectable,
   Logger,
 } from '@nestjs/common';
-import { WorkspaceRole, WorkspaceUser } from '@prisma/client';
+import { User, WorkspaceRole, WorkspaceUser } from '@prisma/client';
 
 import { CreateWorkspaceDto } from './dto/create-workspace.dto';
 import { UpdateWorkspaceDto } from './dto/update-workspace.dto';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { KakaoService } from 'src/kakao/kakao.service';
 
 @Injectable()
 export class WorkspaceService {
   private readonly logger = new Logger(WorkspaceService.name);
 
-  constructor(
-    private readonly prismaService: PrismaService,
-    private readonly kakaoService: KakaoService,
-  ) {}
+  constructor(private readonly prismaService: PrismaService) {}
 
   public async findOneById(id: number) {
     try {
@@ -35,9 +31,11 @@ export class WorkspaceService {
     }
   }
 
-  public async findWorkspaceById(userId: number, workspaceId: number) {
+  public async findWorkspaceById(user: User, workspaceId: number) {
+    const { id: userId, isAdmin } = user;
     const workspaceUser = await this.validateWorkspaceUser(userId, workspaceId);
-    if (!workspaceUser)
+
+    if (!workspaceUser && !isAdmin)
       throw new ForbiddenException('워크스페이스 사용자가 아닙니다.');
 
     try {
@@ -138,10 +136,28 @@ export class WorkspaceService {
     });
   }
 
-  public async findWorkspacesByUserId(userId: number) {
+  private async findAllWorkspaces() {
     try {
       const workspaces = await this.prismaService.workspace.findMany({
-        where: { workspaceUser: { some: { userId } }, deletedAt: null },
+        where: { deletedAt: null },
+      });
+
+      return workspaces;
+    } catch (error) {
+      this.logger.error(error);
+      throw new InternalServerErrorException(
+        '워크스페이스 목록 조회에 실패했습니다.',
+      );
+    }
+  }
+
+  public async findWorkspacesByUserId(user: User) {
+    const { id, isAdmin } = user;
+    if (isAdmin) return await this.findAllWorkspaces(); // 관리자는 모든 워크스페이스 조회
+
+    try {
+      const workspaces = await this.prismaService.workspace.findMany({
+        where: { workspaceUser: { some: { userId: id } }, deletedAt: null },
       });
 
       return workspaces;

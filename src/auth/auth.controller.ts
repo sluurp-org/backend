@@ -21,6 +21,7 @@ import { Serialize } from 'src/common/decorators/serialize.decorator';
 import { TokenDto } from './dto/res/token.dto';
 import { NaverService } from 'src/naver/naver.service';
 import { ConfigService } from '@nestjs/config';
+import { KakaoAuthService } from 'src/kakao-auth/kakao-auth.service';
 
 @ApiTags('auth')
 @Controller('auth')
@@ -28,6 +29,7 @@ export class AuthController {
   constructor(
     private readonly authService: AuthService,
     private readonly naverService: NaverService,
+    private readonly kakaoAuthService: KakaoAuthService,
     private readonly configService: ConfigService,
   ) {}
 
@@ -82,5 +84,27 @@ export class AuthController {
   })
   async naverCallback(@Query('code') code: string) {
     return this.authService.naverLogin(code);
+  }
+
+  @Get('kakao')
+  @Redirect()
+  @ApiOperation({ summary: '카카오 로그인' })
+  async kakao() {
+    return {
+      url: this.kakaoAuthService.getAuthorizationUrl(),
+    };
+  }
+
+  @Get('kakao/callback')
+  @ApiOperation({
+    summary: '카카오 로그인 콜백',
+  })
+  @Serialize(TokenDto)
+  @ApiResponse({
+    status: 200,
+    type: TokenDto,
+  })
+  async kakaoCallback(@Query('code') code: string) {
+    return this.authService.kakaoLogin(code);
   }
 }

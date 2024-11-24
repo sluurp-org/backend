@@ -32,6 +32,14 @@ const validationSchema = Joi.object({
   PORTONE_WEBHOOK_SECRET: Joi.string().required(),
   TELEGRAM_BOT_TOKEN: Joi.string().required(),
   TELEGRAM_CHAT_ID: Joi.string().required(),
+  KAKAO_API_URL: Joi.string()
+    .required()
+    .default('https://nid.naver.com/oauth2.0'),
+  KAKAO_AUTH_URL: Joi.string()
+    .required()
+    .default('https://nid.naver.com/oauth2.0'),
+  KAKAO_CLIENT_ID: Joi.string().required(),
+  KAKAO_CALLBACK_URL: Joi.string().required(),
 });
 
 export default validationSchema;

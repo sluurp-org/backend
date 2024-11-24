@@ -36,6 +36,7 @@ import { EventHistoryWorkspaceModule } from './event-history-workspace/event-his
 import { TelegramModule } from './telegram/telegram.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
+import { KakaoAuthModule } from './kakao-auth/kakao-auth.module';
 
 @Module({
   imports: [
@@ -86,6 +87,7 @@ import { EventEmitterModule } from '@nestjs/event-emitter';
     TelegramModule,
     AnalyticsModule,
     EventEmitterModule.forRoot(),
+    KakaoAuthModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

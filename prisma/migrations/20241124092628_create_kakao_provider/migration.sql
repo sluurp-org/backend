@@ -1,0 +1,2 @@
+-- AlterTable
+ALTER TABLE `User` MODIFY `provider` ENUM('LOCAL', 'NAVER', 'KAKAO') NOT NULL DEFAULT 'LOCAL';

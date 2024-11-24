@@ -7,9 +7,10 @@ import { RefreshTokenStrategy } from './strategies/refresh.strategy';
 import { JwtModule } from '@nestjs/jwt';
 import { WorkerStrategy } from './strategies/worker.strategy';
 import { NaverModule } from 'src/naver/naver.module';
+import { KakaoAuthModule } from 'src/kakao-auth/kakao-auth.module';
 
 @Module({
-  imports: [JwtModule, UsersModule, NaverModule],
+  imports: [JwtModule, UsersModule, NaverModule, KakaoAuthModule],
   controllers: [AuthController],
   providers: [
     AuthService,

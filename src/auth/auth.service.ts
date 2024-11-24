@@ -6,6 +6,7 @@ import { ConfigService } from '@nestjs/config';
 import { TokenDto } from './dto/res/token.dto';
 import { Provider, User } from '@prisma/client';
 import { NaverService } from 'src/naver/naver.service';
+import { KakaoAuthService } from 'src/kakao-auth/kakao-auth.service';
 
 @Injectable()
 export class AuthService {
@@ -13,6 +14,7 @@ export class AuthService {
     private readonly configService: ConfigService,
     private readonly naverService: NaverService,
     private readonly userService: UsersService,
+    private readonly kakaoAuthService: KakaoAuthService,
     private readonly jwtService: JwtService,
   ) {}
 
@@ -78,6 +80,38 @@ export class AuthService {
           salt: profile.id,
         },
         Provider.NAVER,
+        profile.id,
+      );
+
+      const accessToken = this.generateAccessToken(newUser.id);
+      const refreshToken = await this.generateRefreshToken(newUser.id);
+
+      return { accessToken, refreshToken };
+    }
+
+    const accessToken = this.generateAccessToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id);
+
+    return { accessToken, refreshToken };
+  }
+
+  public async kakaoLogin(code: string) {
+    const profile = await this.kakaoAuthService.getProfile(code);
+    const user = await this.userService.findOneByProvider(
+      Provider.KAKAO,
+      profile.id,
+    );
+
+    if (!user) {
+      const newUser = await this.userService.createUserByProvider(
+        {
+          name: profile.name,
+          phone: profile.mobile,
+          password: profile.id,
+          loginId: profile.id,
+          salt: profile.id,
+        },
+        Provider.KAKAO,
         profile.id,
       );
 

@@ -53,6 +53,7 @@ model User {
 enum Provider {
   LOCAL
   NAVER
+  KAKAO
 }
 
 model Benefit {

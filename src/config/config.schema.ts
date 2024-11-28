@@ -32,6 +32,9 @@ const validationSchema = Joi.object({
   PORTONE_WEBHOOK_SECRET: Joi.string().required(),
   TELEGRAM_BOT_TOKEN: Joi.string().required(),
   TELEGRAM_CHAT_ID: Joi.string().required(),
+  GOOGLE_CLIENT_ID: Joi.string().required(),
+  GOOGLE_CLIENT_SECRET: Joi.string().required(),
+  GOOGLE_CALLBACK_URL: Joi.string().required(),
 });
 
 export default validationSchema;

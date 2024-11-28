@@ -21,6 +21,7 @@ import { UserMeDto } from './dto/res/user-me.dto';
 import { CreatePhoneCodeBodyDto } from './dto/req/create-phone-code-body.dto';
 import { FindUserByPhoneBodyDto } from './dto/req/find-user-by-phone-body.dto';
 import { ChangePasswordByCodeDto } from './dto/req/find-user-by-phone-body.dto copy';
+import { CreateProviderUserBodyDto } from './dto/req/create-provider-user-body.dto';
 
 @ApiTags('users')
 @Controller('users')
@@ -71,6 +72,21 @@ export class UsersController {
   @Serialize(UserDto)
   async createUser(@Body() createUserBodyDto: CreateUserBodyDto) {
     return await this.usersService.createUser(createUserBodyDto);
+  }
+
+  @Post('provider')
+  @ApiOperation({ summary: '프로바이더 회원가입' })
+  @ApiResponse({
+    status: 200,
+    type: UserDto,
+  })
+  @Serialize(UserDto)
+  async createProviderUser(
+    @Body() createProviderUserBodyDto: CreateProviderUserBodyDto,
+  ) {
+    return await this.usersService.createProviderUserByRequest(
+      createProviderUserBodyDto,
+    );
   }
 
   @Auth()

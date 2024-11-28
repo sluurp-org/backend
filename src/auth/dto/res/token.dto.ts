@@ -15,4 +15,20 @@ export class TokenDto {
   })
   @Expose()
   refreshToken: string;
+
+  @ApiProperty({
+    example: true,
+    description: '회원가입 필요 여부',
+    nullable: true,
+  })
+  @Expose()
+  isRegister?: boolean;
+
+  @ApiProperty({
+    example: 'id',
+    description: '사용자 아이디',
+    nullable: true,
+  })
+  @Expose()
+  id?: string;
 }

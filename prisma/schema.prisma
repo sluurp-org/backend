@@ -54,6 +54,7 @@ model User {
 
 enum Provider {
   LOCAL
+  GOOGLE
   NAVER
 }
 

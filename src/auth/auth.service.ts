@@ -6,11 +6,13 @@ import { ConfigService } from '@nestjs/config';
 import { TokenDto } from './dto/res/token.dto';
 import { Provider, User } from '@prisma/client';
 import { NaverService } from 'src/naver/naver.service';
+import { GoogleService } from 'src/google/google.service';
 
 @Injectable()
 export class AuthService {
   constructor(
     private readonly configService: ConfigService,
+    private readonly googleService: GoogleService,
     private readonly naverService: NaverService,
     private readonly userService: UsersService,
     private readonly jwtService: JwtService,
@@ -69,7 +71,7 @@ export class AuthService {
     );
 
     if (!user) {
-      const newUser = await this.userService.createUserByProvider(
+      const newUser = await this.userService.createProviderUser(
         {
           name: profile.name,
           phone: profile.mobile,
@@ -86,6 +88,26 @@ export class AuthService {
 
       return { accessToken, refreshToken };
     }
+
+    const accessToken = this.generateAccessToken(user.id);
+    const refreshToken = await this.generateRefreshToken(user.id);
+
+    return { accessToken, refreshToken };
+  }
+
+  public async googleLogin(code: string) {
+    const profile = await this.googleService.getProfile(code);
+    const user = await this.userService.findOneByProvider(
+      Provider.GOOGLE,
+      profile.id,
+    );
+
+    if (!user)
+      return {
+        isRegister: true,
+        id: profile.id,
+        name: profile.name,
+      };
 
     const accessToken = this.generateAccessToken(user.id);
     const refreshToken = await this.generateRefreshToken(user.id);

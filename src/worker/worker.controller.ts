@@ -162,24 +162,4 @@ export class WorkerController {
   public async webhook(@Body() dto: WebhookBodyDto) {
     return this.purchaseService.handlePaymentWebhook(dto);
   }
-
-  @Post('analytics/daily')
-  @ApiOperation({
-    summary: '일일 분석 생성',
-    description: '일일 분석을 생성합니다.',
-  })
-  @WorkerAuth()
-  public async generateDailyAnalytics() {
-    return this.analyticsService.generateDailyAnalytics();
-  }
-
-  @Post('analytics/monthly')
-  @ApiOperation({
-    summary: '월간 분석 생성',
-    description: '월간 분석을 생성합니다.',
-  })
-  @WorkerAuth()
-  public async generateMonthlyAnalytics() {
-    return this.analyticsService.generateMonthlyAnalytics();
-  }
 }

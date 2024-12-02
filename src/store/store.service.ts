@@ -520,7 +520,7 @@ export class StoreService {
         password,
         channelId,
       },
-      provider: 'SMARTPLACe',
+      provider: 'SMARTPLACE',
     };
   }
 

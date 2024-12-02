@@ -6,7 +6,12 @@ import {
   NotFoundException,
 } from '@nestjs/common';
 import { PrismaService } from 'src/prisma/prisma.service';
-import { Prisma, SmartStoreCredentials, StoreType } from '@prisma/client';
+import {
+  Prisma,
+  SmartPlaceCredentials,
+  SmartStoreCredentials,
+  StoreType,
+} from '@prisma/client';
 import { FindStoreQueryDto } from './dto/req/find-store-query.dto';
 import { CreateStoreBodyDto } from './dto/req/create-store-body.dto';
 import { UpdateStoreBodyDto } from './dto/req/update-store-body.dto';
@@ -504,11 +509,25 @@ export class StoreService {
     };
   }
 
+  private generateSmartPlacePayload(
+    smartPlaceCredentials: SmartPlaceCredentials,
+  ) {
+    const { username, password, channelId } = smartPlaceCredentials;
+
+    return {
+      payload: {
+        username,
+        password,
+        channelId,
+      },
+      provider: 'SMARTPLACe',
+    };
+  }
+
   public async sendStoreToSqs() {
     const stores = await this.prismaService.store.findMany({
       where: {
         enabled: true,
-        type: StoreType.SMARTSTORE,
         smartStoreCredentials: {
           isNot: null,
         },
@@ -542,7 +561,7 @@ export class StoreService {
           return {
             id: store.id.toString() + new Date().getTime().toString(),
             body: JSON.stringify({
-              ...store.smartPlaceCredentials,
+              ...this.generateSmartPlacePayload(store.smartPlaceCredentials),
               lastSyncedAt: store.lastOrderSyncAt,
               storeId: store.id,
             }),

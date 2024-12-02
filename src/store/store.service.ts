@@ -528,9 +528,7 @@ export class StoreService {
     const stores = await this.prismaService.store.findMany({
       where: {
         enabled: true,
-        smartStoreCredentials: {
-          isNot: null,
-        },
+        deletedAt: null,
         workspace: {
           deletedAt: null,
         },

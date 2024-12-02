@@ -184,6 +184,7 @@ model Store {
   lastOrderSyncAt   DateTime?
 
   smartStoreCredentials SmartStoreCredentials?
+  smartPlaceCredentials SmartPlaceCredentials?
   workspace             Workspace              @relation(fields: [workspaceId], references: [id])
 
   createdAt DateTime  @default(now())
@@ -199,6 +200,23 @@ model Store {
 
 enum StoreType {
   SMARTSTORE
+  SMARTPLACE
+}
+
+model SmartPlaceCredentials {
+  id        Int    @id @default(autoincrement())
+  storeId   Int    @unique
+  name      String
+  channelId String
+
+  username String
+  password String
+
+  createdAt DateTime  @default(now())
+  updatedAt DateTime  @default(now()) @updatedAt
+  deletedAt DateTime?
+
+  store Store @relation(fields: [storeId], references: [id])
 }
 
 model SmartStoreCredentials {
@@ -216,6 +234,13 @@ model SmartStoreCredentials {
   deletedAt DateTime?
 
   store Store @relation(fields: [storeId], references: [id])
+}
+
+model SmartPlaceCookie {
+  username String @id
+  cookie   Json
+
+  expiresAt DateTime?
 }
 
 model SmartStoreToken {
@@ -322,6 +347,7 @@ model Order {
 }
 
 enum OrderStatus {
+  // normal order status
   PAY_WAITING
   PAYED
   PRODUCT_PREPARE
@@ -332,6 +358,11 @@ enum OrderStatus {
   CANCEL
   REFUND
   CANCEL_NOPAY
+  // smartplace order status
+  REQUEST
+  CONFIRM
+  DONE
+  NOSHOW
 }
 
 model OrderHistory {

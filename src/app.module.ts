@@ -30,13 +30,13 @@ import { SqsModule } from '@ssut/nestjs-sqs';
 import { PurchaseModule } from './purchase/purchase.module';
 import { AwsModule } from './aws/aws.module';
 import { PortoneModule } from './portone/portone.module';
-import { MailModule } from './mail/mail.module';
 import { EventHistoryModule } from './event-history/event-history.module';
 import { EventHistoryWorkspaceModule } from './event-history-workspace/event-history-workspace.module';
 import { TelegramModule } from './telegram/telegram.module';
 import { AnalyticsModule } from './analytics/analytics.module';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { GoogleModule } from './google/google.module';
+import { SmartplaceModule } from './smartplace/smartplace.module';
 
 @Module({
   imports: [
@@ -81,13 +81,13 @@ import { GoogleModule } from './google/google.module';
     PurchaseModule,
     AwsModule,
     PortoneModule,
-    MailModule,
     EventHistoryModule,
     EventHistoryWorkspaceModule,
     TelegramModule,
     AnalyticsModule,
     EventEmitterModule.forRoot(),
     GoogleModule,
+    SmartplaceModule,
   ],
   controllers: [AppController],
   providers: [AppService, IsBcryptHashConstraint, IsVariableConstraint],

@@ -6,13 +6,16 @@ import {
 } from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { ConfigService } from '@nestjs/config';
+import { LambdaClient } from '@aws-sdk/client-lambda';
 
 @Injectable()
 export class AwsService {
   private s3: S3Client;
+  public lambda: LambdaClient;
 
   constructor(private readonly configService: ConfigService) {
     this.s3 = new S3Client({ region: 'ap-northeast-2' });
+    this.lambda = new LambdaClient({ region: 'ap-northeast-2' });
   }
 
   public async createUploadPresignedUrl(key: string, contentType?: string) {

@@ -6,12 +6,18 @@ import {
   IsBoolean,
   ValidateNested,
 } from 'class-validator';
-import { ApiProperty, PartialType } from '@nestjs/swagger';
+import { ApiProperty, PartialType, PickType } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { SmartStoreCredentialsBodyDto } from './credentials/smartstore.dto';
+import { SmartPlaceCredentialsBodyDto } from './credentials/smartplace.dto';
 
 class UpdateSmartStoreCredentialsBodyDto extends PartialType(
   SmartStoreCredentialsBodyDto,
+) {}
+
+class UpdateSmartPlaceCredentialsBodyDto extends PickType(
+  PartialType(SmartPlaceCredentialsBodyDto),
+  ['username', 'password'],
 ) {}
 
 export class UpdateStoreBodyDto {
@@ -40,4 +46,14 @@ export class UpdateStoreBodyDto {
   @ValidateNested()
   @IsNotEmpty()
   smartStoreCredentials?: UpdateSmartStoreCredentialsBodyDto;
+
+  @ApiProperty({
+    description: '스마트플레이스 정보',
+    type: UpdateSmartPlaceCredentialsBodyDto,
+  })
+  @ValidateIf((o) => o.smartPlaceCredentials !== undefined)
+  @Type(() => UpdateSmartPlaceCredentialsBodyDto)
+  @ValidateNested()
+  @IsNotEmpty()
+  smartPlaceCredentials?: UpdateSmartPlaceCredentialsBodyDto;
 }

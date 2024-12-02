@@ -20,6 +20,8 @@ import { PrismaService } from 'src/prisma/prisma.service';
 import { SolapiMessageStatuBodyDto } from './dto/req/solapi-message-status-body.dto';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { WorkspaceService } from 'src/workspace/workspace.service';
+import { FindCookieQueryDto } from 'src/smartplace/dto/find-cookie-query.dto';
+import { SmartplaceService } from 'src/smartplace/smartplace.service';
 
 @Injectable()
 export class WorkerService {
@@ -31,6 +33,7 @@ export class WorkerService {
     private readonly storeService: StoreService,
     private readonly prismaService: PrismaService,
     private readonly kakaoService: KakaoService,
+    private readonly smartplaceService: SmartplaceService,
     private readonly workspaceService: WorkspaceService,
   ) {}
 
@@ -58,6 +61,12 @@ export class WorkerService {
       applicationId,
       applicationSecret,
     );
+  }
+
+  public async findSmartplaceToken(dto: FindCookieQueryDto): Promise<string> {
+    const { username, password } = dto;
+
+    return await this.smartplaceService.findCookie(username, password);
   }
 
   public async updateStoreLastSyncedAt(

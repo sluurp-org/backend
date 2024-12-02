@@ -3,6 +3,7 @@ import { StoreType } from '@prisma/client';
 import { ApiProperty } from '@nestjs/swagger';
 import { Type } from 'class-transformer';
 import { SmartStoreCredentialsBodyDto } from './credentials/smartstore.dto';
+import { SmartPlaceCredentialsBodyDto } from './credentials/smartplace.dto';
 
 export class CreateStoreBodyDto {
   @ApiProperty({
@@ -29,4 +30,12 @@ export class CreateStoreBodyDto {
   @ValidateIf((o) => o.type === StoreType.SMARTSTORE)
   @Type(() => SmartStoreCredentialsBodyDto)
   smartStoreCredentials?: SmartStoreCredentialsBodyDto;
+
+  @ApiProperty({
+    description: '스마트플레이스 정보',
+    type: SmartPlaceCredentialsBodyDto,
+  })
+  @ValidateIf((o) => o.type === StoreType.SMARTPLACE)
+  @Type(() => SmartPlaceCredentialsBodyDto)
+  smartPlaceCredentials?: SmartPlaceCredentialsBodyDto;
 }

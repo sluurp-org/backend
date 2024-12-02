@@ -24,6 +24,7 @@ import { PurchaseService } from 'src/purchase/purchase.service';
 import { PortoneGuard } from 'src/portone/gurad/portone.guard';
 import { WebhookBodyDto } from 'src/portone/dto/req/webhook-body.dto';
 import { AnalyticsService } from 'src/analytics/analytics.service';
+import { FindCookieQueryDto } from 'src/smartplace/dto/find-cookie-query.dto';
 
 @ApiTags('worker')
 @Controller('worker')
@@ -92,6 +93,21 @@ export class WorkerController {
   @WorkerAuth()
   public async findAccessToken(@Query() dto: FindTokenQueryDto) {
     return await this.workerService.findSmartstoreToken(dto);
+  }
+
+  @ApiOperation({
+    summary: '네이버 플레이스 쿠키 조회',
+    description: '네이버 플레이스 쿠키를 조회합니다.',
+  })
+  @ApiResponse({
+    status: 200,
+    description: '네이버 플레이스 토큰 조회 성공',
+    type: String,
+  })
+  @Get('smartplace/token')
+  @WorkerAuth()
+  public async findSmartplaceToken(@Query() dto: FindCookieQueryDto) {
+    return await this.workerService.findSmartplaceToken(dto);
   }
 
   @ApiOperation({

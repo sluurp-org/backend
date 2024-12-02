@@ -2,6 +2,7 @@ import { ApiProperty } from '@nestjs/swagger';
 import { StoreType } from '@prisma/client';
 import { Exclude, Expose, Type } from 'class-transformer';
 import { SmartStoreCredentialsDto } from './credentials/smartstore.dto';
+import { SmartPlaceCredentialsDto } from './credentials/smartplace.dto';
 
 export class StoreDto {
   @ApiProperty({
@@ -55,6 +56,15 @@ export class StoreDto {
   @Type(() => SmartStoreCredentialsDto)
   @Expose()
   smartStoreCredentials?: SmartStoreCredentialsDto;
+
+  @ApiProperty({
+    type: SmartPlaceCredentialsDto,
+    description: '스마트플레이스 정보',
+    nullable: true,
+  })
+  @Type(() => SmartPlaceCredentialsDto)
+  @Expose()
+  smartPlaceCredentials?: SmartPlaceCredentialsDto;
 
   @Exclude()
   workspaceId: number;

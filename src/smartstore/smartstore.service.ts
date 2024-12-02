@@ -16,6 +16,7 @@ import { isAxiosError } from 'axios';
 import { KakaoService } from 'src/kakao/kakao.service';
 import { WorkspaceService } from 'src/workspace/workspace.service';
 import { differenceInMinutes } from 'date-fns';
+import { CreateProductInterface } from 'src/store/interface/create-product.interface';
 
 @Injectable()
 export class SmartstoreService {
@@ -128,7 +129,7 @@ export class SmartstoreService {
   public async getProducts(
     applicationId: string,
     applicationSecret: string,
-  ): Promise<Content[]> {
+  ): Promise<CreateProductInterface[]> {
     const accessToken = await this.findAccessToken(
       applicationId,
       applicationSecret,
@@ -160,7 +161,22 @@ export class SmartstoreService {
         page++;
       } while (page < totalPages);
 
-      return allProducts;
+      return allProducts
+        .map((product) => {
+          const { originProductNo, channelProducts } = product;
+          const productInfo = channelProducts.find(
+            (channelProduct) =>
+              channelProduct.originProductNo === originProductNo,
+          );
+          if (!productInfo) return;
+
+          return {
+            productId: originProductNo.toString(),
+            name: productInfo.name,
+            productImageUrl: productInfo.representativeImage.url,
+          };
+        })
+        .filter((item) => item !== undefined);
     } catch (error) {
       await this.handleCommerceError(error, applicationId);
       this.logger.error(error);
@@ -365,19 +381,5 @@ export class SmartstoreService {
     const hashed = hashSync(`${applicationId}_${timestamp}`, applicationSecret);
 
     return Buffer.from(hashed).toString('base64');
-  }
-
-  private async validateToken(token: string): Promise<boolean> {
-    if (!token) throw new BadRequestException('토큰이 필요합니다.');
-
-    try {
-      await this.httpService.get('/v1/seller/account', {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      return true;
-    } catch (error) {
-      return false;
-    }
   }
 }

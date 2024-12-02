@@ -9,6 +9,7 @@ import { PurchaseModule } from 'src/purchase/purchase.module';
 import { KakaoModule } from 'src/kakao/kakao.module';
 import { AnalyticsModule } from 'src/analytics/analytics.module';
 import { WorkspaceModule } from 'src/workspace/workspace.module';
+import { SmartplaceModule } from 'src/smartplace/smartplace.module';
 
 @Module({
   imports: [
@@ -18,6 +19,7 @@ import { WorkspaceModule } from 'src/workspace/workspace.module';
     StoreModule,
     PrismaModule,
     PurchaseModule,
+    SmartplaceModule,
     KakaoModule,
     AnalyticsModule,
     WorkspaceModule,

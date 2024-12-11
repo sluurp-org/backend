@@ -194,6 +194,24 @@ export class UpsertOrderBodyDto {
   @IsString()
   @IsOptional()
   deliveryTrackingNumber?: string;
+
+  @ApiProperty({
+    description: '주문 시작일',
+    example: '2024-08-26T10:30:00.000Z',
+    required: false,
+  })
+  @IsDate()
+  @IsOptional()
+  startDate?: Date;
+
+  @ApiProperty({
+    description: '주문 종료일',
+    example: '2024-08-26T10:30:00.000Z',
+    required: false,
+  })
+  @IsDate()
+  @IsOptional()
+  endDate?: Date;
 }
 
 export class UpsertOrdersBatchBodyDto {

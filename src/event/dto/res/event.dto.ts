@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { OrderStatus } from '@prisma/client';
+import { DelayType, DateTarget, OrderStatus } from '@prisma/client';
 import { Exclude, Expose, Type } from 'class-transformer';
 import { MessageDto } from 'src/message/dto/res/message.dto';
 
@@ -108,6 +108,22 @@ export class EventDto {
 
   @Expose()
   @ApiProperty({
+    description: '발송 기준일',
+    enum: DateTarget,
+    example: DateTarget.ORDER,
+  })
+  dateTarget: DateTarget;
+
+  @Expose()
+  @ApiProperty({
+    description: '발송 시간 유형',
+    enum: DelayType,
+    example: DelayType.FUTURE,
+  })
+  delayType: DelayType;
+
+  @Expose()
+  @ApiProperty({
     description: '발송 지연일',
     example: 1,
   })
@@ -115,10 +131,24 @@ export class EventDto {
 
   @Expose()
   @ApiProperty({
+    description: '발송 지연일',
+    example: 1,
+  })
+  delayHours: number;
+
+  @Expose()
+  @ApiProperty({
     description: '발송 시간',
     example: 1,
   })
-  sendHour: number;
+  fixedHour: number;
+
+  @Expose()
+  @ApiProperty({
+    description: '배송 여부',
+    example: false,
+  })
+  confirmDelivery: boolean;
 
   @Exclude()
   workspaceId: number;

@@ -328,6 +328,9 @@ model Order {
   deliveryCompany        String?
   deliveryTrackingNumber String?
 
+  startDate DateTime?
+  endDate   DateTime?
+
   createdBy OrderCreatedBy @default(SYSTEM)
 
   product        Product         @relation(fields: [productId], references: [id])
@@ -463,8 +466,13 @@ model Event {
   type    OrderStatus
   enabled Boolean     @default(true)
 
-  delayDays Int?
-  sendHour  Int? // 0 ~ 23 korea standard time
+  dateTarget DateTarget @default(ORDER)
+  delayType  DelayType  @default(FUTURE)
+  delayDays  Int?
+  delayHour  Int?
+  fixedHour  Int? // 0 ~ 23 korea standard time
+
+  confirmDelivery Boolean @default(false)
 
   product        Product?        @relation(fields: [productId], references: [id])
   productVariant ProductVariant? @relation(fields: [productVariantId], references: [id])
@@ -476,6 +484,16 @@ model Event {
   eventHistory EventHistory[]
 
   @@unique([productId, productVariantId, messageId, type])
+}
+
+enum DateTarget {
+  ORDER
+  RESERVATION
+}
+
+enum DelayType {
+  PAST
+  FUTURE
 }
 
 model EventHistoryContentConnection {
@@ -539,11 +557,10 @@ enum EventStatus {
 }
 
 model Message {
-  id               Int             @id @default(autoincrement())
-  name             String
-  completeDelivery Boolean         @default(false)
-  sendType         MessageSendType
-  type             MessageType     @default(FULLY_CUSTOM)
+  id       Int             @id @default(autoincrement())
+  name     String
+  sendType MessageSendType
+  type     MessageType     @default(FULLY_CUSTOM)
 
   content String?
 

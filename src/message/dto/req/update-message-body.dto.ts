@@ -1,7 +1,6 @@
 import { ApiProperty, PartialType } from '@nestjs/swagger';
 import { CreateKakaoTemplateBodyDto } from './subtemplate/create-kakao-template-body.dto';
 import {
-  IsBoolean,
   IsEmail,
   IsEnum,
   IsNumber,
@@ -35,14 +34,6 @@ export class UpdateMessageBodyDto {
   @IsNumber()
   @IsOptional()
   contentGroupId?: number;
-
-  @ApiProperty({
-    description: '메시지 배송 완료 여부',
-    example: true,
-  })
-  @IsBoolean()
-  @IsOptional()
-  completeDelivery?: boolean;
 
   @ApiProperty({
     description: '카카오 템플릿 ID',

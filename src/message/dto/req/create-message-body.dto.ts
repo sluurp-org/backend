@@ -1,6 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
 import {
-  IsBoolean,
   IsEmail,
   IsEnum,
   IsNotEmpty,
@@ -32,14 +31,6 @@ export class CreateMessageBodyDto {
   @IsNumber()
   @IsOptional()
   contentGroupId?: number;
-
-  @ApiProperty({
-    description: '메시지 배송 완료 여부',
-    example: true,
-  })
-  @IsBoolean()
-  @IsOptional()
-  completeDelivery?: boolean;
 
   @ApiProperty({
     description: '메시지 템플릿 발송 타입',

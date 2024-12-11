@@ -354,7 +354,6 @@ export class MessageService {
     const {
       kakaoTemplate,
       name,
-      completeDelivery,
       content: messageContent,
       contentGroupId,
       customEmail,
@@ -404,7 +403,6 @@ export class MessageService {
         where: { id: message.id },
         data: {
           name,
-          completeDelivery,
           content: messageContent,
           customEmail,
           customPhone,

@@ -203,7 +203,7 @@ export class WorkerService {
             return {
               event,
               success: true,
-              isUpdateDelivery: event?.event?.message.completeDelivery,
+              isUpdateDelivery: event?.event?.confirmDelivery,
               updatedEventHistory,
             };
           }
@@ -228,7 +228,7 @@ export class WorkerService {
           return {
             event,
             success: false,
-            isUpdateDelivery: event?.event?.message.completeDelivery,
+            isUpdateDelivery: event?.event?.confirmDelivery,
             updatedEventHistory,
           };
         });

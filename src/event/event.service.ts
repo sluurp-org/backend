@@ -5,6 +5,8 @@ import { CreateEventBodyDto } from './dto/req/create-event-body.dto';
 import { UpdateEventBodyDto } from './dto/req/update-event-body.dto';
 import { FindEventHistoryQueryDto } from './dto/req/find-event-history-query.dto';
 import {
+  DateTarget,
+  DelayType,
   EventStatus,
   MessageTarget,
   Order,
@@ -14,7 +16,17 @@ import {
 } from '@prisma/client';
 
 import { ContentService } from 'src/content/content.service';
-import { format } from 'date-fns';
+import {
+  addDays,
+  addHours,
+  format,
+  setHours,
+  setMilliseconds,
+  setMinutes,
+  setSeconds,
+  subDays,
+  subHours,
+} from 'date-fns';
 import { ko } from 'date-fns/locale';
 
 @Injectable()
@@ -149,17 +161,44 @@ export class EventService {
   }
 
   private calculateScheduledAt(
-    sendHour: number | null,
+    dateTarget: DateTarget,
+    delayType: DelayType,
     delayDays: number | null,
+    delayHour: number | null,
+    sendHour: number | null,
+    reservationDate: Date | null,
   ): Date {
-    const now = new Date();
+    let targetDate = new Date();
 
-    const kstNow = new Date(now.getTime() + 9 * 60 * 60 * 1000);
+    // 기준 날짜 설정
+    if (dateTarget === DateTarget.RESERVATION && reservationDate) {
+      targetDate = reservationDate;
+    }
 
-    if (delayDays) kstNow.setDate(kstNow.getDate() + delayDays);
-    if (sendHour) kstNow.setHours(sendHour, 0, 0, 0);
+    // 지연 계산
+    if (delayType === DelayType.FUTURE) {
+      if (delayDays) targetDate = addDays(targetDate, delayDays);
+      if (delayHour) targetDate = addHours(targetDate, delayHour);
+    } else {
+      if (delayDays) targetDate = subDays(targetDate, delayDays);
+      if (delayHour) targetDate = subHours(targetDate, delayHour);
+    }
 
-    return new Date(kstNow.getTime() - 9 * 60 * 60 * 1000);
+    // KST 변환 (UTC + 9시간)
+    const kstDate = addHours(targetDate, 9);
+
+    // 특정 전송 시간 설정
+    if (sendHour !== null) {
+      targetDate = setHours(kstDate, sendHour); // 시간 설정
+      targetDate = setMinutes(targetDate, 0); // 분 설정
+      targetDate = setSeconds(targetDate, 0); // 초 설정
+      targetDate = setMilliseconds(targetDate, 0); // 밀리초 설정
+    } else {
+      targetDate = kstDate;
+    }
+
+    // UTC 변환 (KST - 9시간)
+    return subHours(targetDate, 9);
   }
 
   private async createEventHistoryInput(
@@ -186,12 +225,16 @@ export class EventService {
       id: orderId,
       ordererPhone,
       receiverPhone: orderReceiverPhone,
+      startDate,
       quantity,
     } = order;
     const {
       id: eventId,
       delayDays,
-      sendHour,
+      fixedHour,
+      dateTarget,
+      delayHour,
+      delayType,
       message: { id: messageId, contentGroup, target, customPhone },
     } = event;
 
@@ -215,10 +258,17 @@ export class EventService {
       order: { connect: { id: orderId } },
       status: EventStatus.FAILED,
       receiverPhone,
-      scheduledAt:
-        sendHour || delayDays
-          ? this.calculateScheduledAt(sendHour, delayDays)
-          : new Date(),
+      scheduledAt: this.calculateScheduledAt(
+        dateTarget,
+        delayType,
+        delayDays,
+        delayHour,
+        fixedHour,
+        startDate,
+      ),
+      // sendHour || delayDays
+      //   ? this.calculateScheduledAt(sendHour, delayDays)
+      //   : new Date(),
     };
 
     if (contentGroup) {
